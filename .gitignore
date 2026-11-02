@@ -1,0 +1,7 @@
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+coverage.xml
+*.db
+negociacion/out/
+*.class

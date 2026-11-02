@@ -1,0 +1,284 @@
+openapi: 3.0.3
+info:
+  title: API de ServiLink Pamplona
+  description: Contrato de la API REST del monolito modular (diseño Design-First). Un endpoint por contexto delimitado.
+  version: 0.1.0
+servers:
+  - url: http://localhost:8080/api/v1
+    description: Desarrollo local
+  - url: https://servilink-staging.onrender.com/api/v1
+    description: Staging (Render)
+security:
+  - bearerAuth: []
+tags:
+  - name: Identidad
+  - name: Solicitudes
+  - name: Matching
+  - name: Billetera
+  - name: Notificaciones
+paths:
+  /auth/login:
+    post:
+      tags: [Identidad]
+      summary: Iniciar sesión y obtener un JWT
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+      responses:
+        '200':
+          description: Credenciales válidas
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TokenResponse' }
+        '400': { $ref: '#/components/responses/SolicitudInvalida' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+  /solicitudes:
+    post:
+      tags: [Solicitudes]
+      summary: Publicar una solicitud de servicio (rol HOGAR)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SolicitudCrear' }
+      responses:
+        '201':
+          description: Solicitud creada en estado E01 (Abierta)
+          headers:
+            Location:
+              description: URI de la solicitud creada
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SolicitudResponse' }
+        '400': { $ref: '#/components/responses/SolicitudInvalida' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+  /solicitudes/{solicitudId}:
+    get:
+      tags: [Solicitudes]
+      summary: Consultar una solicitud propia o a la que se postuló
+      parameters:
+        - { $ref: '#/components/parameters/SolicitudId' }
+      responses:
+        '200':
+          description: Detalle de la solicitud
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SolicitudResponse' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+  /solicitudes/{solicitudId}/asignacion:
+    post:
+      tags: [Solicitudes]
+      summary: Aceptar una postulación y asignar al técnico (E02 a E03)
+      parameters:
+        - { $ref: '#/components/parameters/SolicitudId' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AsignacionCrear' }
+      responses:
+        '200':
+          description: Técnico asignado; se muestra el contacto solo a partir de E03
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AsignacionResponse' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '409':
+          description: La solicitud no está en E02 o la ventana ya expiró
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problema' }
+        '422':
+          description: Saldo insuficiente del técnico para retener la comisión
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problema' }
+  /tecnicos/cercanos:
+    get:
+      tags: [Matching]
+      summary: Listar técnicos elegibles dentro del radio (rol HOGAR)
+      parameters:
+        - { name: oficioId, in: query, required: true, schema: { type: integer, minimum: 1 } }
+        - { name: lat, in: query, required: true, schema: { type: number, minimum: -90, maximum: 90 } }
+        - { name: lng, in: query, required: true, schema: { type: number, minimum: -180, maximum: 180 } }
+        - { name: radioKm, in: query, required: false, schema: { type: number, default: 5, minimum: 1, maximum: 20 } }
+      responses:
+        '200':
+          description: Técnicos elegibles, con datos públicos únicamente
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/TecnicoPublicResponse' }
+        '400': { $ref: '#/components/responses/SolicitudInvalida' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+  /billetera:
+    get:
+      tags: [Billetera]
+      summary: Consultar el saldo y los últimos movimientos (rol TECNICO)
+      responses:
+        '200':
+          description: Estado de la billetera del técnico autenticado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BilleteraResponse' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+  /dispositivos/{dispositivoId}:
+    put:
+      tags: [Notificaciones]
+      summary: Registrar o actualizar el token FCM de un dispositivo
+      parameters:
+        - { name: dispositivoId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DispositivoRegistro' }
+      responses:
+        '204': { description: Token registrado o actualizado }
+        '400': { $ref: '#/components/responses/SolicitudInvalida' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    SolicitudId:
+      name: solicitudId
+      in: path
+      required: true
+      schema: { type: integer, format: int64, minimum: 1 }
+  responses:
+    SolicitudInvalida:
+      description: Datos de entrada inválidos
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problema' }
+    NoAutenticado:
+      description: Token ausente, vencido o con firma inválida
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problema' }
+    SinPermiso:
+      description: Token válido, pero sin permiso sobre el recurso
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problema' }
+    NoEncontrado:
+      description: El recurso no existe
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problema' }
+  schemas:
+    Problema:
+      type: object
+      required: [type, title, status]
+      properties:
+        type: { type: string, example: 'https://servilink.co/errores/ventana-expirada' }
+        title: { type: string, example: La ventana de postulación expiró }
+        status: { type: integer, example: 409 }
+        detail: { type: string }
+    LoginRequest:
+      type: object
+      required: [correo, clave]
+      properties:
+        correo: { type: string, format: email }
+        clave: { type: string, format: password, minLength: 8 }
+    TokenResponse:
+      type: object
+      required: [accessToken, tokenType, expiresIn]
+      properties:
+        accessToken: { type: string }
+        tokenType: { type: string, enum: [Bearer] }
+        expiresIn: { type: integer, example: 900, description: Segundos de vigencia }
+        refreshToken: { type: string }
+    Ubicacion:
+      type: object
+      required: [lat, lng]
+      properties:
+        lat: { type: number, minimum: -90, maximum: 90, example: 7.8939 }
+        lng: { type: number, minimum: -180, maximum: 180, example: -72.5078 }
+    SolicitudCrear:
+      type: object
+      required: [oficioId, descripcion, ubicacion]
+      properties:
+        oficioId: { type: integer, minimum: 1 }
+        descripcion: { type: string, minLength: 10, maxLength: 500 }
+        ubicacion: { $ref: '#/components/schemas/Ubicacion' }
+        precioSugeridoCop: { type: integer, minimum: 0, example: 60000 }
+        fotos:
+          type: array
+          maxItems: 5
+          items: { type: string, format: uri }
+    SolicitudResponse:
+      type: object
+      required: [id, estado, oficioId, descripcion, expiraEn]
+      properties:
+        id: { type: integer, format: int64 }
+        estado: { type: string, enum: [E01, E02, E03, E04, E05, E06, E07] }
+        oficioId: { type: integer }
+        descripcion: { type: string }
+        precioAcordadoCop: { type: integer, nullable: true }
+        expiraEn: { type: string, format: date-time }
+    AsignacionCrear:
+      type: object
+      required: [postulacionId]
+      properties:
+        postulacionId: { type: integer, format: int64 }
+    ContactoAsignado:
+      type: object
+      description: Visible solo para las dos partes y solo desde E03
+      required: [nombre, telefono]
+      properties:
+        nombre: { type: string }
+        telefono: { type: string, example: '+57 300 000 0000' }
+    AsignacionResponse:
+      type: object
+      required: [solicitudId, estado, comisionRetenidaCop, contacto]
+      properties:
+        solicitudId: { type: integer, format: int64 }
+        estado: { type: string, enum: [E03] }
+        comisionRetenidaCop: { type: integer, example: 6000 }
+        contacto: { $ref: '#/components/schemas/ContactoAsignado' }
+    TecnicoPublicResponse:
+      type: object
+      required: [id, nombrePila, oficio, distanciaKm]
+      properties:
+        id: { type: integer, format: int64 }
+        nombrePila: { type: string, example: Carlos }
+        oficio: { type: string, example: Electricista }
+        distanciaKm: { type: number, example: 1.8 }
+    BilleteraResponse:
+      type: object
+      required: [saldoDisponibleCop, saldoRetenidoCop, movimientos]
+      properties:
+        saldoDisponibleCop: { type: integer, example: 24000 }
+        saldoRetenidoCop: { type: integer, example: 6000 }
+        movimientos:
+          type: array
+          items:
+            type: object
+            required: [id, tipo, valorCop, fecha]
+            properties:
+              id: { type: integer, format: int64 }
+              tipo: { type: string, enum: [RECARGA, RETENCION, COMISION, LIBERACION] }
+              valorCop: { type: integer }
+              fecha: { type: string, format: date-time }
+    DispositivoRegistro:
+      type: object
+      required: [fcmToken]
+      properties:
+        fcmToken: { type: string, minLength: 20 }

@@ -1,0 +1,69 @@
+{
+  "consumer": {
+    "name": "pwa-servilink"
+  },
+  "interactions": [
+    {
+      "description": "asignar un técnico a una solicitud en E02",
+      "pending": false,
+      "providerStates": [
+        {
+          "name": "la solicitud 1 está en E02 y el técnico 21 tiene saldo"
+        }
+      ],
+      "request": {
+        "body": {
+          "content": {
+            "postulacionId": 11
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "headers": {
+          "Authorization": [
+            "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI3Iiwicm9sIjoiSE9HQVIiLCJleHAiOjQxMDI0NDQ4MDB9.vjIElsV6mvVFXqyE4E4BPb6J5hvGGIEDWAAZlczDXqM"
+          ],
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "method": "POST",
+        "path": "/api/v1/solicitudes/1/asignacion"
+      },
+      "response": {
+        "body": {
+          "content": {
+            "comisionRetenidaCop": 6000,
+            "contacto": {
+              "nombre": "Carlos",
+              "telefono": "+57 300 000 0000"
+            },
+            "estado": "E03",
+            "solicitudId": 1
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "status": 200
+      },
+      "type": "Synchronous/HTTP"
+    }
+  ],
+  "metadata": {
+    "pactRust": {
+      "ffi": "0.5.12",
+      "models": "1.3.16"
+    },
+    "pactSpecification": {
+      "version": "4.0"
+    }
+  },
+  "provider": {
+    "name": "api-servilink"
+  }
+}
