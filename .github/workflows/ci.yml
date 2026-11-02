@@ -95,7 +95,7 @@ jobs:
           name: cobertura
           path: backend-ref
       - name: SonarCloud (rompe el build si el Quality Gate falla)
-        uses: SonarSource/sonarqube-scan-action@v7
+        uses: SonarSource/sonarqube-scan-action@v8
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         with:
