@@ -1,0 +1,11 @@
+fastapi
+httpx
+respx
+sqlalchemy
+pytest
+pytest-cov
+jsonschema
+pyjwt
+pact-python
+uvicorn
+pyyaml
