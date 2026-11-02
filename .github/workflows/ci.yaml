@@ -20,15 +20,12 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
 
-      - name: Dar permisos de ejecución a Maven
-        run: chmod +x mvnw
-
       - name: Compilar, Pruebas y Análisis SonarCloud
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
-          ./mvnw clean verify sonar:sonar \
+          mvn clean verify sonar:sonar \
             -Dsonar.organization=jaiderson2609 \
             -Dsonar.projectKey=Jaiderson2609_Servilink-Pamplona \
             -Dsonar.host.url=https://sonarcloud.io
