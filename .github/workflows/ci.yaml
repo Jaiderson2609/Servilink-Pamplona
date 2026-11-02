@@ -19,7 +19,6 @@ jobs:
         with:
           java-version: '21'
           distribution: 'temurin'
-          cache: 'maven'
 
       - name: Dar permisos de ejecución a Maven
         run: chmod +x mvnw
