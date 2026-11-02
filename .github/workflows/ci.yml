@@ -58,7 +58,7 @@ jobs:
           distribution: temurin
           java-version: "21"
       - name: Pruebas Java (TDD de negociación)
-        run: ./negociacion/run.sh
+        run: bash negociacion/run.sh
       - name: Pruebas de integración y contrato (cobertura mínima 90 %)
         working-directory: backend-ref
         run: |
