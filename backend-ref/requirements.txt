@@ -1,11 +1,7 @@
-fastapi
-httpx
+-r requirements-prod.txt
 respx
-sqlalchemy
 pytest
 pytest-cov
 jsonschema
-pyjwt
 pact-python
-uvicorn
 pyyaml
