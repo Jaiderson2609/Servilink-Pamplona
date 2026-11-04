@@ -5,3 +5,5 @@ coverage.xml
 *.db
 negociacion/out/
 *.class
+.env
+experimentos/

@@ -65,8 +65,14 @@ class Movimiento(Base):
 
 
 def crear_motor(url="sqlite://"):
-    """Por defecto, SQLite en memoria: efímera y aislada de cualquier base real."""
-    return create_engine(url, connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    """Por defecto, SQLite en memoria: efímera y aislada de cualquier base real.
+
+    Con cualquier otra URL (PostgreSQL en Docker Compose) se usa un pool normal que verifica la
+    conexión antes de entregarla, para tolerar que la base reinicie.
+    """
+    if str(url).startswith("sqlite"):
+        return create_engine(url, connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    return create_engine(url, pool_pre_ping=True)
 
 
 def reloj_real():

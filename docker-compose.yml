@@ -1,0 +1,58 @@
+# Orquestación local del MVP de ServiLink (FPI-26).
+# Las credenciales NO están aquí: se leen del archivo .env (ignorado por Git). Ver .env.example.
+name: servilink
+
+services:
+  api:
+    build:
+      context: ./backend-ref
+      target: runtime
+    image: servilink-api:${IMAGE_TAG:-local}
+    restart: unless-stopped
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_USER: ${POSTGRES_USER:?Define POSTGRES_USER en el archivo .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en el archivo .env}
+      POSTGRES_DB: ${POSTGRES_DB:?Define POSTGRES_DB en el archivo .env}
+      JWT_SECRET: ${JWT_SECRET:?Define JWT_SECRET en el archivo .env (mínimo 32 caracteres)}
+    ports:
+      - "127.0.0.1:8000:8000" # solo accesible desde este equipo
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - interna
+      - publica
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+  db:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?Define POSTGRES_USER en el archivo .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en el archivo .env}
+      POSTGRES_DB: ${POSTGRES_DB:?Define POSTGRES_DB en el archivo .env}
+    volumes:
+      - servilink_pgdata:/var/lib/postgresql/data # los datos sobreviven a «docker compose down»
+    networks:
+      - interna # sin puertos publicados: solo la API puede hablar con la base
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+networks:
+  interna:
+    internal: true # sin salida a Internet ni al exterior
+  publica: {}
+
+volumes:
+  servilink_pgdata:
