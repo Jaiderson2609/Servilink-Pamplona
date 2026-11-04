@@ -90,7 +90,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0   # SonarCloud necesita el historial completo
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: cobertura
           path: backend-ref
