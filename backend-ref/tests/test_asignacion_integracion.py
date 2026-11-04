@@ -108,3 +108,28 @@ def test_el_teléfono_solo_aparece_en_el_contacto(entorno):
 
 def test_la_base_usada_es_efimera_en_memoria(entorno):
     assert str(entorno.motor.url) == "sqlite://"
+
+
+def test_frontera_justo_en_el_instante_de_expiracion_responde_409(entorno):
+    """Regla: la ventana vale mientras reloj < expira_en; en el instante exacto ya expiró."""
+    entorno.reloj["ahora"] = entorno.reloj["ahora"] + timedelta(minutes=5)  # == expira_en
+    assert entorno.cliente.post(URL, json=CUERPO, headers=token()).status_code == 409
+
+
+def test_frontera_un_segundo_antes_de_expirar_si_asigna(entorno):
+    entorno.reloj["ahora"] = entorno.reloj["ahora"] + timedelta(minutes=5, seconds=-1)
+    assert entorno.cliente.post(URL, json=CUERPO, headers=token()).status_code == 200
+
+
+def test_frontera_saldo_igual_a_la_comision_si_asigna_y_queda_en_cero(entorno):
+    with entorno.S.begin() as s:
+        s.get(Billetera, 21).disponible = 6000  # == comisión del 10 % de 60.000
+    assert entorno.cliente.post(URL, json=CUERPO, headers=token()).status_code == 200
+    with entorno.S() as s:
+        assert (s.get(Billetera, 21).disponible, s.get(Billetera, 21).retenido) == (0, 6000)
+
+
+def test_frontera_saldo_un_peso_menor_que_la_comision_responde_422(entorno):
+    with entorno.S.begin() as s:
+        s.get(Billetera, 21).disponible = 5999
+    assert entorno.cliente.post(URL, json=CUERPO, headers=token()).status_code == 422
