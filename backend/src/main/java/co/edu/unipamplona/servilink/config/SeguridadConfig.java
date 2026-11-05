@@ -35,7 +35,16 @@ public class SeguridadConfig {
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(a -> a
                         .requestMatchers("/actuator/health", "/api/v1/auth/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/solicitudes").hasRole("HOGAR")
                         .requestMatchers(HttpMethod.POST, "/api/v1/solicitudes/*/asignacion").hasRole("HOGAR")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/solicitudes/*/postulaciones").hasRole("HOGAR")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/solicitudes/*/confirmacion").hasRole("HOGAR")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/solicitudes/*/postulaciones").hasRole("TECNICO")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/solicitudes/*/llegada").hasRole("TECNICO")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/solicitudes/*/trabajo-terminado").hasRole("TECNICO")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/solicitudes/*/cancelacion").hasAnyRole("HOGAR", "TECNICO")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/solicitudes/abiertas").hasRole("TECNICO")
+                        .requestMatchers("/api/v1/billetera/**", "/api/v1/billetera").hasRole("TECNICO")
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(o -> o
                         .jwt(j -> j.jwtAuthenticationConverter(convertidor))
@@ -48,9 +57,21 @@ public class SeguridadConfig {
     }
 
     @Bean
-    JwtDecoder decodificador(Configuracion config) {
+    JwtDecoder decodificador(Configuracion config, java.time.Clock reloj) {
         var clave = new SecretKeySpec(config.jwtSecret().getBytes(StandardCharsets.UTF_8), "HmacSHA256");
-        return NimbusJwtDecoder.withSecretKey(clave).macAlgorithm(MacAlgorithm.HS256).build();
+        var decodificador = NimbusJwtDecoder.withSecretKey(clave).macAlgorithm(MacAlgorithm.HS256).build();
+        // El vencimiento se valida con el mismo reloj de la aplicación (así también es comprobable en pruebas).
+        var tiempo = new org.springframework.security.oauth2.jwt.JwtTimestampValidator(java.time.Duration.ofSeconds(30));
+        tiempo.setClock(reloj);
+        decodificador.setJwtValidator(tiempo);
+        return decodificador;
+    }
+
+    @Bean
+    org.springframework.security.oauth2.jwt.JwtEncoder emisor(Configuracion config) {
+        var clave = new SecretKeySpec(config.jwtSecret().getBytes(StandardCharsets.UTF_8), "HmacSHA256");
+        return new org.springframework.security.oauth2.jwt.NimbusJwtEncoder(
+                new com.nimbusds.jose.jwk.source.ImmutableSecret<>(clave));
     }
 
     @Bean

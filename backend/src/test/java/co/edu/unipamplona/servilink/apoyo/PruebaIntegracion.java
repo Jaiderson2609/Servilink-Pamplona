@@ -76,8 +76,8 @@ public abstract class PruebaIntegracion {
     }
 
     protected long solicitud(long hogarId, String estado, Instant expiraEn) {
-        return jdbc.queryForObject("INSERT INTO solicitudes (hogar_id, oficio, descripcion, estado, expira_en) "
-                + "VALUES (?, 'Electricista', 'Cambiar un tomacorriente', ?, ?) RETURNING id", Long.class,
+        return jdbc.queryForObject("INSERT INTO solicitudes (hogar_id, oficio_id, descripcion, estado, expira_en) "
+                + "VALUES (?, 2, 'Cambiar un tomacorriente', ?, ?) RETURNING id", Long.class,
                 hogarId, estado, java.sql.Timestamp.from(expiraEn));
     }
 

@@ -12,7 +12,10 @@ public class Solicitud {
     private Long id;
     @Column(name = "hogar_id")
     private Long hogarId;
-    private String oficio;
+    @Column(name = "oficio_id")
+    private Integer oficioId;
+    private Double lat;
+    private Double lng;
     private String descripcion;
     private String estado;
     @Column(name = "expira_en")
@@ -27,12 +30,21 @@ public class Solicitud {
     private Integer comisionCop;
     @Column(name = "creada_en")
     private Instant creadaEn;
+    @Column(name = "terminado_en")
+    private Instant terminadoEn;
+    @Column(name = "cancelada_por")
+    private String canceladaPor;
+    @Column(name = "motivo_cancelacion")
+    private String motivoCancelacion;
 
     protected Solicitud() {}
 
-    public Solicitud(Long hogarId, String oficio, String descripcion, Instant expiraEn, Instant creadaEn) {
+    public Solicitud(Long hogarId, Integer oficioId, String descripcion, Double lat, Double lng, Instant expiraEn,
+                     Instant creadaEn) {
         this.hogarId = hogarId;
-        this.oficio = oficio;
+        this.oficioId = oficioId;
+        this.lat = lat;
+        this.lng = lng;
         this.descripcion = descripcion;
         this.estado = "E01";
         this.expiraEn = expiraEn;
@@ -41,7 +53,9 @@ public class Solicitud {
 
     public Long getId() { return id; }
     public Long getHogarId() { return hogarId; }
-    public String getOficio() { return oficio; }
+    public Integer getOficioId() { return oficioId; }
+    public Double getLat() { return lat; }
+    public Double getLng() { return lng; }
     public String getDescripcion() { return descripcion; }
     public String getEstado() { return estado; }
     public void setEstado(String estado) { this.estado = estado; }
@@ -56,4 +70,10 @@ public class Solicitud {
     public Integer getComisionCop() { return comisionCop; }
     public void setComisionCop(Integer comisionCop) { this.comisionCop = comisionCop; }
     public Instant getCreadaEn() { return creadaEn; }
+    public Instant getTerminadoEn() { return terminadoEn; }
+    public void setTerminadoEn(Instant terminadoEn) { this.terminadoEn = terminadoEn; }
+    public String getCanceladaPor() { return canceladaPor; }
+    public void setCanceladaPor(String canceladaPor) { this.canceladaPor = canceladaPor; }
+    public String getMotivoCancelacion() { return motivoCancelacion; }
+    public void setMotivoCancelacion(String motivoCancelacion) { this.motivoCancelacion = motivoCancelacion; }
 }
