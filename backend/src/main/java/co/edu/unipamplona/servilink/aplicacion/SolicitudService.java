@@ -21,7 +21,8 @@ public class SolicitudService {
 
     public record Vista(Long id, String estado, Integer oficioId, String oficio, String descripcion,
                         Integer precioAcordadoCop, Integer comisionCop, Instant expiraEn, Instant terminadoEn,
-                        Long hogarId, Long tecnicoId, String motivoCancelacion, Contacto contacto) {}
+                        Long hogarId, Long tecnicoId, String motivoCancelacion, Contacto contacto,
+                        Integer distanciaM) {}
 
     public record VistaPostulacion(Long id, Long tecnicoId, String tecnico, Integer precioCop, String mensaje,
                                    String estado) {}
@@ -31,17 +32,19 @@ public class SolicitudService {
     private final BilleteraRepositorio billeteras;
     private final OficioRepositorio oficios;
     private final UsuarioRepositorio usuarios;
+    private final UbicacionTecnicoRepositorio ubicaciones;
     private final Configuracion config;
     private final Clock reloj;
 
     public SolicitudService(SolicitudRepositorio solicitudes, PostulacionRepositorio postulaciones,
                             BilleteraRepositorio billeteras, OficioRepositorio oficios, UsuarioRepositorio usuarios,
-                            Configuracion config, Clock reloj) {
+                            UbicacionTecnicoRepositorio ubicaciones, Configuracion config, Clock reloj) {
         this.solicitudes = solicitudes;
         this.postulaciones = postulaciones;
         this.billeteras = billeteras;
         this.oficios = oficios;
         this.usuarios = usuarios;
+        this.ubicaciones = ubicaciones;
         this.config = config;
         this.reloj = reloj;
     }
@@ -124,7 +127,18 @@ public class SolicitudService {
     /** Solicitudes que aún reciben postulaciones. El filtro por oficio y radio (PostGIS) queda pendiente. */
     @Transactional(readOnly = true)
     public List<Vista> abiertas(Long tecnicoId) {
-        return solicitudes.findByEstadoInAndExpiraEnAfterOrderByIdDesc(List.of("E01", "E02"), reloj.instant())
+        Instant ahora = reloj.instant();
+        if (ubicaciones.existsById(tecnicoId)) {
+            // Con zona de trabajo definida: solo lo que cae dentro del radio, de la más cercana a la más lejana.
+            var cercanas = solicitudes.cercanas(tecnicoId, ahora);
+            var porId = new java.util.HashMap<Long, Solicitud>();
+            solicitudes.findAllById(cercanas.stream().map(SolicitudRepositorio.Cercana::getId).toList())
+                    .forEach(s -> porId.put(s.getId(), s));
+            return cercanas.stream()
+                    .map(c -> vista(porId.get(c.getId()), tecnicoId, "TECNICO", (int) Math.round(c.getDistancia())))
+                    .toList();
+        }
+        return solicitudes.findByEstadoInAndExpiraEnAfterOrderByIdDesc(List.of("E01", "E02"), ahora)
                 .stream().map(s -> vista(s, tecnicoId, "TECNICO")).toList();
     }
 
@@ -136,6 +150,10 @@ public class SolicitudService {
 
     /** El contacto de la contraparte se muestra solo a las partes y solo desde E03 (RF-015 y RF-036). */
     Vista vista(Solicitud s, Long usuarioId, String rol) {
+        return vista(s, usuarioId, rol, null);
+    }
+
+    Vista vista(Solicitud s, Long usuarioId, String rol, Integer distanciaM) {
         Contacto contacto = null;
         if (List.of("E03", "E04", "E05").contains(s.getEstado()) && s.getTecnicoId() != null) {
             Long otroId = "HOGAR".equals(rol) ? s.getTecnicoId() : s.getHogarId();
@@ -144,7 +162,7 @@ public class SolicitudService {
         String oficio = oficios.findById(s.getOficioId()).map(Oficio::getNombre).orElse(null);
         return new Vista(s.getId(), s.getEstado(), s.getOficioId(), oficio, s.getDescripcion(), s.getPrecioAcordado(),
                 s.getComisionCop(), s.getExpiraEn(), s.getTerminadoEn(), s.getHogarId(), s.getTecnicoId(),
-                s.getMotivoCancelacion(), contacto);
+                s.getMotivoCancelacion(), contacto, distanciaM);
     }
 
     private VistaPostulacion vistaPostulacion(Postulacion p) {

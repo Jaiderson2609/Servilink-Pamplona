@@ -24,6 +24,28 @@ public interface SolicitudRepositorio extends JpaRepository<Solicitud, Long> {
 
     List<Solicitud> findByHogarIdOrderByIdDesc(Long hogarId);
 
+    /** Solicitud abierta con su distancia en metros al punto base del técnico. */
+    interface Cercana {
+        Long getId();
+
+        Double getDistancia();
+    }
+
+    /**
+     * Solicitudes abiertas dentro del radio del técnico, de la más cercana a la más lejana.
+     * ST_DWithin usa el índice GIST; ST_Distance sobre geography devuelve metros.
+     */
+    @Query(value = """
+            select s.id as id, ST_Distance(s.punto, u.punto) as distancia
+              from solicitudes s
+              join ubicaciones_tecnico u on u.tecnico_id = :tecnicoId
+             where s.estado in ('E01', 'E02')
+               and s.expira_en > :ahora
+               and ST_DWithin(s.punto, u.punto, u.radio_km * 1000.0)
+             order by distancia asc, s.id desc
+            """, nativeQuery = true)
+    List<Cercana> cercanas(Long tecnicoId, Instant ahora);
+
     List<Solicitud> findByEstadoInAndExpiraEnAfterOrderByIdDesc(Collection<String> estados, Instant ahora);
 
     @Query("select s from Solicitud s where s.tecnicoId = :t or s.id in "

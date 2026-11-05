@@ -36,4 +36,9 @@ public final class Peticiones {
 
     public record Recarga(
             @NotNull(message = "valorCop es obligatorio") @Min(value = 1000, message = "valorCop debe ser al menos 1000") @Max(value = 1_000_000, message = "valorCop excede el máximo") Long valorCop) {}
+
+    public record ZonaTrabajo(
+            @NotNull(message = "lat es obligatoria") @DecimalMin(value = "-90", message = "lat fuera de rango") @DecimalMax(value = "90", message = "lat fuera de rango") Double lat,
+            @NotNull(message = "lng es obligatoria") @DecimalMin(value = "-180", message = "lng fuera de rango") @DecimalMax(value = "180", message = "lng fuera de rango") Double lng,
+            @Min(value = 1, message = "el radio mínimo es 1 km") @Max(value = 50, message = "el radio máximo es 50 km") Integer radioKm) {}
 }
