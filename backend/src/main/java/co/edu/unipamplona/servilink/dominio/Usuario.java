@@ -17,6 +17,12 @@ public class Usuario {
     @Column(name = "token_push")
     private String tokenPush;
 
+    private boolean suspendido;
+    @Column(name = "motivo_suspension")
+    private String motivoSuspension;
+    @Column(name = "suspendido_en")
+    private java.time.Instant suspendidoEn;
+
     protected Usuario() {}
 
     public Usuario(String rol, String nombre, String correo, String telefono, String passwordHash) {
@@ -35,4 +41,18 @@ public class Usuario {
     public String getPasswordHash() { return passwordHash; }
     public String getTokenPush() { return tokenPush; }
     public void setTokenPush(String tokenPush) { this.tokenPush = tokenPush; }
+    public boolean isSuspendido() { return suspendido; }
+    public String getMotivoSuspension() { return motivoSuspension; }
+
+    public void suspender(String motivo, java.time.Instant ahora) {
+        this.suspendido = true;
+        this.motivoSuspension = motivo;
+        this.suspendidoEn = ahora;
+    }
+
+    public void reactivar() {
+        this.suspendido = false;
+        this.motivoSuspension = null;
+        this.suspendidoEn = null;
+    }
 }

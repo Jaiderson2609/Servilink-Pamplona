@@ -12,4 +12,7 @@ public interface BilleteraRepositorio extends JpaRepository<Billetera, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select b from Billetera b where b.tecnicoId = :id")
     Optional<Billetera> bloquear(Long id);
+
+    @Query("select coalesce(sum(b.retenido), 0) from Billetera b")
+    long totalRetenido();
 }

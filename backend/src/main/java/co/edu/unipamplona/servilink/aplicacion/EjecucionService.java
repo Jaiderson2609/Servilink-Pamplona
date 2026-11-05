@@ -120,6 +120,35 @@ public class EjecucionService {
         return new Efecto<>(consultas.vista(s, usuarioId, rol), avisoId);
     }
 
+    /**
+     * Cancelación por un administrador (disputas). Cubre E01 a E04; desde E03 libera la comisión retenida (RN-15).
+     * Avisa al hogar de inmediato y deja el aviso del técnico en la bandeja de reintentos.
+     */
+    @Transactional
+    public Efecto<Solicitud> cancelarAdministrativa(Long solicitudId, String motivo) {
+        Solicitud s = solicitudes.bloquear(solicitudId).orElseThrow(SolicitudService::noEncontrada);
+        if (!java.util.List.of("E01", "E02", "E03", "E04").contains(s.getEstado())) {
+            throw estadoInvalido(s);
+        }
+        if (motivo == null || motivo.trim().length() < 5) {
+            throw new ErrorNegocio(HttpStatus.BAD_REQUEST, "Solicitud invalida", "El motivo debe tener al menos 5 caracteres");
+        }
+        boolean asignada = s.getTecnicoId() != null && java.util.List.of("E03", "E04").contains(s.getEstado());
+        if (asignada) {
+            Billetera b = billeteras.bloquear(s.getTecnicoId()).orElseThrow();
+            long comision = s.getComisionCop();
+            b.liberar(comision);
+            libro.save(new Movimiento(b.getTecnicoId(), s.getId(), "LIBERACION", comision, b.getDisponible(),
+                    "LIB-" + s.getId(), reloj.instant()));
+            aviso("CANCA-" + s.getId() + "-T", s.getTecnicoId(), "Un administrador canceló el servicio");
+        }
+        Long avisoHogar = aviso("CANCA-" + s.getId() + "-H", s.getHogarId(), "Un administrador canceló tu solicitud");
+        s.setEstado("E07");
+        s.setCanceladaPor("ADMIN");
+        s.setMotivoCancelacion(motivo.trim());
+        return new Efecto<>(s, avisoHogar);
+    }
+
     private Long aviso(String clave, Long destinatario, String texto) {
         Instant ahora = reloj.instant();
         return avisos.save(new NotificacionPendiente(clave, destinatario, texto, ahora)).getId();

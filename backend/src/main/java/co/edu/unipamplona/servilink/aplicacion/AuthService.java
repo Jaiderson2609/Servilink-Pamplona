@@ -61,11 +61,28 @@ public class AuthService {
         if (u == null || !codificador.matches(clave, u.getPasswordHash())) {
             throw new ErrorNegocio(HttpStatus.UNAUTHORIZED, "No autenticado", "Correo o clave incorrectos");
         }
+        if (u.isSuspendido()) {
+            throw new ErrorNegocio(HttpStatus.FORBIDDEN, "Cuenta suspendida", "Tu cuenta está suspendida; contacta al administrador");
+        }
         var ahora = reloj.instant();
         var claims = JwtClaimsSet.builder().subject(String.valueOf(u.getId())).claim("rol", u.getRol())
                 .issuedAt(ahora).expiresAt(ahora.plus(Duration.ofSeconds(config.tokenVigenciaSeg()))).build();
         String token = jwt.encode(JwtEncoderParameters.from(JwsHeader.with(MacAlgorithm.HS256).build(), claims))
                 .getTokenValue();
         return new Sesion(token, config.tokenVigenciaSeg(), u.getId(), u.getRol(), u.getNombre());
+    }
+
+    /** Crea la cuenta de administrador inicial si no existe. Devuelve true si la creó. */
+    @Transactional
+    public boolean asegurarAdmin(String correo, String clave) {
+        if (clave == null || clave.length() < 12) {
+            throw new IllegalStateException("ADMIN_CLAVE debe tener al menos 12 caracteres");
+        }
+        String normal = correo.trim().toLowerCase(Locale.ROOT);
+        if (usuarios.findByCorreo(normal).isPresent()) {
+            return false;
+        }
+        usuarios.save(new Usuario("ADMIN", "Administrador", normal, "0000000", codificador.encode(clave)));
+        return true;
     }
 }

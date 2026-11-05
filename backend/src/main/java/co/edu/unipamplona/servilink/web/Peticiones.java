@@ -48,4 +48,7 @@ public final class Peticiones {
     public record CalificacionCrear(
             @NotNull(message = "las estrellas son obligatorias") @Min(value = 1, message = "las estrellas van de 1 a 5") @Max(value = 5, message = "las estrellas van de 1 a 5") Integer estrellas,
             @Size(max = 300, message = "el comentario admite hasta 300 caracteres") String comentario) {}
+
+    public record MotivoAdmin(
+            @NotBlank(message = "el motivo es obligatorio") @Size(min = 5, max = 200, message = "el motivo debe tener entre 5 y 200 caracteres") String motivo) {}
 }

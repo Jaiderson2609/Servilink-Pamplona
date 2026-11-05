@@ -12,6 +12,14 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 /** Ayudas para recorrer la API por HTTP, como lo haría un cliente real (sin tocar la base directamente). */
 public abstract class PruebaApi extends PruebaIntegracion {
 
+    @org.springframework.beans.factory.annotation.Autowired protected co.edu.unipamplona.servilink.aplicacion.AuthService auth;
+
+    /** Crea un administrador (no se puede registrar por la API pública) e inicia sesión. */
+    protected String cuentaAdmin(String correo) throws Exception {
+        auth.asegurarAdmin(correo, "clave-admin-segura-1");
+        return campo(enviar(null, "/api/v1/auth/login", "{\"correo\":\"" + correo + "\",\"clave\":\"clave-admin-segura-1\"}"), "$.accessToken");
+    }
+
     protected ResultActions enviar(String token, String url, String json) throws Exception {
         MockHttpServletRequestBuilder req = post(url).contentType(MediaType.APPLICATION_JSON).content(json == null ? "" : json);
         if (token != null) {
