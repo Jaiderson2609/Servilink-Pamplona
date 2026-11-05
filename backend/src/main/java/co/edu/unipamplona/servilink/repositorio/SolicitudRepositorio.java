@@ -24,6 +24,11 @@ public interface SolicitudRepositorio extends JpaRepository<Solicitud, Long> {
 
     List<Solicitud> findByHogarIdOrderByIdDesc(Long hogarId);
 
+    org.springframework.data.domain.Page<Solicitud> findByEstado(String estado, org.springframework.data.domain.Pageable pagina);
+
+    @Query("select s.estado, count(s) from Solicitud s group by s.estado")
+    List<Object[]> contarPorEstado();
+
     /** Solicitud abierta con su distancia en metros al punto base del técnico. */
     interface Cercana {
         Long getId();

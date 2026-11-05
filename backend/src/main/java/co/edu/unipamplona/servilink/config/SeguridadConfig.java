@@ -44,6 +44,7 @@ public class SeguridadConfig {
                         .requestMatchers(HttpMethod.POST, "/api/v1/solicitudes/*/trabajo-terminado").hasRole("TECNICO")
                         .requestMatchers(HttpMethod.POST, "/api/v1/solicitudes/*/cancelacion").hasAnyRole("HOGAR", "TECNICO")
                         .requestMatchers(HttpMethod.GET, "/api/v1/solicitudes/abiertas").hasRole("TECNICO")
+                        .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/v1/tecnicos/yo/**").hasRole("TECNICO")
                         .requestMatchers("/api/v1/billetera/**", "/api/v1/billetera").hasRole("TECNICO")
                         .anyRequest().authenticated())
@@ -58,13 +59,27 @@ public class SeguridadConfig {
     }
 
     @Bean
-    JwtDecoder decodificador(Configuracion config, java.time.Clock reloj) {
+    JwtDecoder decodificador(Configuracion config, java.time.Clock reloj,
+                             co.edu.unipamplona.servilink.repositorio.UsuarioRepositorio usuarios) {
         var clave = new SecretKeySpec(config.jwtSecret().getBytes(StandardCharsets.UTF_8), "HmacSHA256");
         var decodificador = NimbusJwtDecoder.withSecretKey(clave).macAlgorithm(MacAlgorithm.HS256).build();
         // El vencimiento se valida con el mismo reloj de la aplicación (así también es comprobable en pruebas).
         var tiempo = new org.springframework.security.oauth2.jwt.JwtTimestampValidator(java.time.Duration.ofSeconds(30));
         tiempo.setClock(reloj);
-        decodificador.setJwtValidator(tiempo);
+        // Una cuenta suspendida pierde el acceso de inmediato, sin esperar a que venza su token.
+        org.springframework.security.oauth2.core.OAuth2TokenValidator<org.springframework.security.oauth2.jwt.Jwt> activa = token -> {
+            try {
+                if (Boolean.TRUE.equals(usuarios.estaSuspendido(Long.parseLong(token.getSubject())))) {
+                    return org.springframework.security.oauth2.core.OAuth2TokenValidatorResult.failure(
+                            new org.springframework.security.oauth2.core.OAuth2Error("cuenta_suspendida", "Cuenta suspendida", null));
+                }
+            } catch (NumberFormatException e) {
+                return org.springframework.security.oauth2.core.OAuth2TokenValidatorResult.failure(
+                        new org.springframework.security.oauth2.core.OAuth2Error("invalid_token", "Token inválido", null));
+            }
+            return org.springframework.security.oauth2.core.OAuth2TokenValidatorResult.success();
+        };
+        decodificador.setJwtValidator(new org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator<>(tiempo, activa));
         return decodificador;
     }
 
