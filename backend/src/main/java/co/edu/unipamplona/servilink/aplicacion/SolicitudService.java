@@ -1,0 +1,158 @@
+package co.edu.unipamplona.servilink.aplicacion;
+
+import co.edu.unipamplona.servilink.config.Configuracion;
+import co.edu.unipamplona.servilink.dominio.*;
+import co.edu.unipamplona.servilink.repositorio.*;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.List;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+/** Creación, consulta y postulación a solicitudes (RF-017, RF-020, RF-021, RF-026). */
+@Service
+public class SolicitudService {
+
+    public static final List<String> ACTIVAS = List.of("E01", "E02", "E03", "E04");
+
+    public record Contacto(String nombre, String telefono) {}
+
+    public record Vista(Long id, String estado, Integer oficioId, String oficio, String descripcion,
+                        Integer precioAcordadoCop, Integer comisionCop, Instant expiraEn, Instant terminadoEn,
+                        Long hogarId, Long tecnicoId, String motivoCancelacion, Contacto contacto) {}
+
+    public record VistaPostulacion(Long id, Long tecnicoId, String tecnico, Integer precioCop, String mensaje,
+                                   String estado) {}
+
+    private final SolicitudRepositorio solicitudes;
+    private final PostulacionRepositorio postulaciones;
+    private final BilleteraRepositorio billeteras;
+    private final OficioRepositorio oficios;
+    private final UsuarioRepositorio usuarios;
+    private final Configuracion config;
+    private final Clock reloj;
+
+    public SolicitudService(SolicitudRepositorio solicitudes, PostulacionRepositorio postulaciones,
+                            BilleteraRepositorio billeteras, OficioRepositorio oficios, UsuarioRepositorio usuarios,
+                            Configuracion config, Clock reloj) {
+        this.solicitudes = solicitudes;
+        this.postulaciones = postulaciones;
+        this.billeteras = billeteras;
+        this.oficios = oficios;
+        this.usuarios = usuarios;
+        this.config = config;
+        this.reloj = reloj;
+    }
+
+    /** TR-01: nace en E01 con una ventana de postulación; un hogar solo puede tener una solicitud activa (RN-06). */
+    @Transactional
+    public Vista crear(Long hogarId, Integer oficioId, String descripcion, double lat, double lng) {
+        if (!oficios.existsById(oficioId)) {
+            throw new ErrorNegocio(HttpStatus.BAD_REQUEST, "Solicitud invalida", "El oficio no existe");
+        }
+        Instant ahora = reloj.instant();
+        solicitudes.expirarVencidasDe(hogarId, ahora); // una solicitud vencida no debe bloquear una nueva
+        if (solicitudes.existsByHogarIdAndEstadoIn(hogarId, ACTIVAS)) {
+            throw new ErrorNegocio(HttpStatus.CONFLICT, "Solicitud activa", "Ya tienes una solicitud en curso");
+        }
+        Solicitud s = solicitudes.save(new Solicitud(hogarId, oficioId, descripcion.trim(), lat, lng,
+                ahora.plus(Duration.ofMinutes(config.ventanaPostulacionMin())), ahora));
+        return vista(s, hogarId, "HOGAR");
+    }
+
+    /** TR-02: la primera postulación pasa a E02 y abre la ventana de elección del hogar. */
+    @Transactional
+    public VistaPostulacion postular(Long tecnicoId, Long solicitudId, int precio, String mensaje) {
+        Solicitud s = solicitudes.bloquear(solicitudId).orElseThrow(SolicitudService::noEncontrada);
+        if (!"E01".equals(s.getEstado()) && !"E02".equals(s.getEstado())) {
+            throw new ErrorNegocio(HttpStatus.CONFLICT, "Estado invalido", "La solicitud está en " + s.getEstado());
+        }
+        Instant ahora = reloj.instant();
+        if (!ahora.isBefore(s.getExpiraEn())) { // RN-03: decide el reloj del servidor
+            throw new ErrorNegocio(HttpStatus.CONFLICT, "Ventana expirada", "La ventana de postulación terminó");
+        }
+        if (postulaciones.existsBySolicitudIdAndTecnicoId(solicitudId, tecnicoId)) { // RN-08
+            throw new ErrorNegocio(HttpStatus.CONFLICT, "Postulacion duplicada", "Ya te postulaste a esta solicitud");
+        }
+        long saldo = billeteras.findById(tecnicoId).map(Billetera::getDisponible).orElse(0L);
+        if (saldo < config.saldoMinimo()) { // RF-039
+            throw new ErrorNegocio(HttpStatus.UNPROCESSABLE_ENTITY, "Saldo insuficiente",
+                    "Se necesita un saldo mínimo de " + config.saldoMinimo() + " COP para postularse");
+        }
+        if (solicitudes.existsByTecnicoIdAndEstadoIn(tecnicoId, List.of("E03", "E04"))) { // RN-07
+            throw new ErrorNegocio(HttpStatus.CONFLICT, "Tecnico ocupado", "Ya tienes un servicio activo");
+        }
+        Postulacion p = postulaciones.save(new Postulacion(solicitudId, tecnicoId, precio, mensaje, ahora));
+        if ("E01".equals(s.getEstado())) {
+            s.setEstado("E02");
+            s.setExpiraEn(ahora.plus(Duration.ofMinutes(config.ventanaEleccionMin())));
+        }
+        return vistaPostulacion(p);
+    }
+
+    /** RF-022: el hogar ve las postulaciones de su solicitud. */
+    @Transactional(readOnly = true)
+    public List<VistaPostulacion> postulaciones(Long hogarId, Long solicitudId) {
+        Solicitud s = solicitudes.findById(solicitudId).orElseThrow(SolicitudService::noEncontrada);
+        if (!s.getHogarId().equals(hogarId)) {
+            throw new ErrorNegocio(HttpStatus.FORBIDDEN, "Sin permiso", "La solicitud es de otro hogar");
+        }
+        return postulaciones.findBySolicitudId(solicitudId).stream().map(this::vistaPostulacion).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public Vista obtener(Long usuarioId, String rol, Long solicitudId) {
+        Solicitud s = solicitudes.findById(solicitudId).orElseThrow(SolicitudService::noEncontrada);
+        boolean esHogar = s.getHogarId().equals(usuarioId);
+        boolean esTecnico = usuarioId.equals(s.getTecnicoId())
+                || (!"HOGAR".equals(rol) && postulaciones.existsBySolicitudIdAndTecnicoId(solicitudId, usuarioId));
+        if (!esHogar && !esTecnico) {
+            throw new ErrorNegocio(HttpStatus.FORBIDDEN, "Sin permiso", "No participas en esta solicitud");
+        }
+        return vista(s, usuarioId, rol);
+    }
+
+    @Transactional(readOnly = true)
+    public List<Vista> mias(Long usuarioId, String rol) {
+        var lista = "HOGAR".equals(rol) ? solicitudes.findByHogarIdOrderByIdDesc(usuarioId)
+                : solicitudes.deTecnico(usuarioId);
+        return lista.stream().map(s -> vista(s, usuarioId, rol)).toList();
+    }
+
+    /** Solicitudes que aún reciben postulaciones. El filtro por oficio y radio (PostGIS) queda pendiente. */
+    @Transactional(readOnly = true)
+    public List<Vista> abiertas(Long tecnicoId) {
+        return solicitudes.findByEstadoInAndExpiraEnAfterOrderByIdDesc(List.of("E01", "E02"), reloj.instant())
+                .stream().map(s -> vista(s, tecnicoId, "TECNICO")).toList();
+    }
+
+    /** RF-026: barrido de las solicitudes vencidas; lo invoca el trabajo programado. */
+    @Transactional
+    public int expirarVencidas() {
+        return solicitudes.expirarVencidas(reloj.instant());
+    }
+
+    /** El contacto de la contraparte se muestra solo a las partes y solo desde E03 (RF-015 y RF-036). */
+    Vista vista(Solicitud s, Long usuarioId, String rol) {
+        Contacto contacto = null;
+        if (List.of("E03", "E04", "E05").contains(s.getEstado()) && s.getTecnicoId() != null) {
+            Long otroId = "HOGAR".equals(rol) ? s.getTecnicoId() : s.getHogarId();
+            contacto = usuarios.findById(otroId).map(u -> new Contacto(u.getNombre(), u.getTelefono())).orElse(null);
+        }
+        String oficio = oficios.findById(s.getOficioId()).map(Oficio::getNombre).orElse(null);
+        return new Vista(s.getId(), s.getEstado(), s.getOficioId(), oficio, s.getDescripcion(), s.getPrecioAcordado(),
+                s.getComisionCop(), s.getExpiraEn(), s.getTerminadoEn(), s.getHogarId(), s.getTecnicoId(),
+                s.getMotivoCancelacion(), contacto);
+    }
+
+    private VistaPostulacion vistaPostulacion(Postulacion p) {
+        String nombre = usuarios.findById(p.getTecnicoId()).map(Usuario::getNombre).orElse("");
+        return new VistaPostulacion(p.getId(), p.getTecnicoId(), nombre, p.getPrecio(), p.getMensaje(), p.getEstado());
+    }
+
+    static ErrorNegocio noEncontrada() {
+        return new ErrorNegocio(HttpStatus.NOT_FOUND, "No encontrado", "Solicitud inexistente");
+    }
+}
