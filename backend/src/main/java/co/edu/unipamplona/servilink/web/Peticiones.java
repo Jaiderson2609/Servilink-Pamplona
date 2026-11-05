@@ -41,4 +41,11 @@ public final class Peticiones {
             @NotNull(message = "lat es obligatoria") @DecimalMin(value = "-90", message = "lat fuera de rango") @DecimalMax(value = "90", message = "lat fuera de rango") Double lat,
             @NotNull(message = "lng es obligatoria") @DecimalMin(value = "-180", message = "lng fuera de rango") @DecimalMax(value = "180", message = "lng fuera de rango") Double lng,
             @Min(value = 1, message = "el radio mínimo es 1 km") @Max(value = 50, message = "el radio máximo es 50 km") Integer radioKm) {}
+
+    public record MensajeCrear(
+            @NotBlank(message = "el mensaje no puede estar vacío") @Size(max = 500, message = "el mensaje admite hasta 500 caracteres") String texto) {}
+
+    public record CalificacionCrear(
+            @NotNull(message = "las estrellas son obligatorias") @Min(value = 1, message = "las estrellas van de 1 a 5") @Max(value = 5, message = "las estrellas van de 1 a 5") Integer estrellas,
+            @Size(max = 300, message = "el comentario admite hasta 300 caracteres") String comentario) {}
 }

@@ -25,7 +25,7 @@ public class SolicitudService {
                         Integer distanciaM) {}
 
     public record VistaPostulacion(Long id, Long tecnicoId, String tecnico, Integer precioCop, String mensaje,
-                                   String estado) {}
+                                   String estado, Double calificacionPromedio, long calificaciones) {}
 
     private final SolicitudRepositorio solicitudes;
     private final PostulacionRepositorio postulaciones;
@@ -33,18 +33,21 @@ public class SolicitudService {
     private final OficioRepositorio oficios;
     private final UsuarioRepositorio usuarios;
     private final UbicacionTecnicoRepositorio ubicaciones;
+    private final CalificacionRepositorio calificaciones;
     private final Configuracion config;
     private final Clock reloj;
 
     public SolicitudService(SolicitudRepositorio solicitudes, PostulacionRepositorio postulaciones,
                             BilleteraRepositorio billeteras, OficioRepositorio oficios, UsuarioRepositorio usuarios,
-                            UbicacionTecnicoRepositorio ubicaciones, Configuracion config, Clock reloj) {
+                            UbicacionTecnicoRepositorio ubicaciones, CalificacionRepositorio calificaciones,
+                            Configuracion config, Clock reloj) {
         this.solicitudes = solicitudes;
         this.postulaciones = postulaciones;
         this.billeteras = billeteras;
         this.oficios = oficios;
         this.usuarios = usuarios;
         this.ubicaciones = ubicaciones;
+        this.calificaciones = calificaciones;
         this.config = config;
         this.reloj = reloj;
     }
@@ -167,7 +170,10 @@ public class SolicitudService {
 
     private VistaPostulacion vistaPostulacion(Postulacion p) {
         String nombre = usuarios.findById(p.getTecnicoId()).map(Usuario::getNombre).orElse("");
-        return new VistaPostulacion(p.getId(), p.getTecnicoId(), nombre, p.getPrecio(), p.getMensaje(), p.getEstado());
+        long total = calificaciones.countByDestinatarioId(p.getTecnicoId());
+        Double promedio = total == 0 ? null : Math.round(calificaciones.promedio(p.getTecnicoId()) * 100.0) / 100.0;
+        return new VistaPostulacion(p.getId(), p.getTecnicoId(), nombre, p.getPrecio(), p.getMensaje(), p.getEstado(),
+                promedio, total);
     }
 
     static ErrorNegocio noEncontrada() {

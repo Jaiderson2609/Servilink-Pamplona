@@ -44,7 +44,7 @@ public class SeguridadConfig {
                         .requestMatchers(HttpMethod.POST, "/api/v1/solicitudes/*/trabajo-terminado").hasRole("TECNICO")
                         .requestMatchers(HttpMethod.POST, "/api/v1/solicitudes/*/cancelacion").hasAnyRole("HOGAR", "TECNICO")
                         .requestMatchers(HttpMethod.GET, "/api/v1/solicitudes/abiertas").hasRole("TECNICO")
-                        .requestMatchers("/api/v1/tecnicos/**").hasRole("TECNICO")
+                        .requestMatchers("/api/v1/tecnicos/yo/**").hasRole("TECNICO")
                         .requestMatchers("/api/v1/billetera/**", "/api/v1/billetera").hasRole("TECNICO")
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(o -> o

@@ -1,0 +1,80 @@
+package co.edu.unipamplona.servilink.web;
+
+import co.edu.unipamplona.servilink.aplicacion.CalificacionService;
+import co.edu.unipamplona.servilink.aplicacion.ChatService;
+import co.edu.unipamplona.servilink.aplicacion.FotoService;
+import jakarta.validation.Valid;
+import java.io.IOException;
+import java.net.URI;
+import java.util.List;
+import org.springframework.http.CacheControl;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+/** Fotos, chat y calificaciones de una solicitud. Los permisos finos (quién es parte) los decide el servicio. */
+@RestController
+@RequestMapping("/api/v1")
+public class ParticipantesController {
+
+    private final FotoService fotos;
+    private final ChatService chat;
+    private final CalificacionService calificaciones;
+
+    public ParticipantesController(FotoService fotos, ChatService chat, CalificacionService calificaciones) {
+        this.fotos = fotos;
+        this.chat = chat;
+        this.calificaciones = calificaciones;
+    }
+
+    private static Long id(Jwt jwt) { return Long.valueOf(jwt.getSubject()); }
+    private static String rol(Jwt jwt) { return jwt.getClaimAsString("rol"); }
+
+    @PostMapping(path = "/solicitudes/{solicitudId}/fotos", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<FotoService.Resumen> subirFoto(@PathVariable Long solicitudId,
+            @RequestParam("foto") MultipartFile foto, @AuthenticationPrincipal Jwt jwt) throws IOException {
+        var r = fotos.subir(id(jwt), solicitudId, foto.getBytes());
+        return ResponseEntity.created(URI.create("/api/v1/solicitudes/" + solicitudId + "/fotos/" + r.id())).body(r);
+    }
+
+    @GetMapping("/solicitudes/{solicitudId}/fotos")
+    public List<FotoService.Resumen> listarFotos(@PathVariable Long solicitudId, @AuthenticationPrincipal Jwt jwt) {
+        return fotos.listar(id(jwt), rol(jwt), solicitudId);
+    }
+
+    @GetMapping("/solicitudes/{solicitudId}/fotos/{fotoId}")
+    public ResponseEntity<byte[]> descargarFoto(@PathVariable Long solicitudId, @PathVariable Long fotoId,
+            @AuthenticationPrincipal Jwt jwt) {
+        var f = fotos.obtener(id(jwt), rol(jwt), solicitudId, fotoId);
+        return ResponseEntity.ok().contentType(MediaType.parseMediaType(f.getTipoMime()))
+                .cacheControl(CacheControl.noStore()).header("X-Content-Type-Options", "nosniff").body(f.getContenido());
+    }
+
+    @PostMapping("/solicitudes/{solicitudId}/mensajes")
+    public ResponseEntity<ChatService.Vista> enviarMensaje(@PathVariable Long solicitudId,
+            @Valid @RequestBody Peticiones.MensajeCrear m, @AuthenticationPrincipal Jwt jwt) {
+        var v = chat.enviar(id(jwt), solicitudId, m.texto());
+        return ResponseEntity.created(URI.create("/api/v1/solicitudes/" + solicitudId + "/mensajes/" + v.id())).body(v);
+    }
+
+    @GetMapping("/solicitudes/{solicitudId}/mensajes")
+    public List<ChatService.Vista> mensajes(@PathVariable Long solicitudId,
+            @RequestParam(defaultValue = "0") long despues, @AuthenticationPrincipal Jwt jwt) {
+        return chat.listar(id(jwt), solicitudId, despues);
+    }
+
+    @PostMapping("/solicitudes/{solicitudId}/calificacion")
+    public ResponseEntity<CalificacionService.Vista> calificar(@PathVariable Long solicitudId,
+            @Valid @RequestBody Peticiones.CalificacionCrear c, @AuthenticationPrincipal Jwt jwt) {
+        var v = calificaciones.calificar(id(jwt), solicitudId, c.estrellas(), c.comentario());
+        return ResponseEntity.created(URI.create("/api/v1/solicitudes/" + solicitudId + "/calificacion")).body(v);
+    }
+
+    @GetMapping("/tecnicos/{tecnicoId}/reputacion")
+    public CalificacionService.Reputacion reputacion(@PathVariable Long tecnicoId) {
+        return calificaciones.reputacion(tecnicoId);
+    }
+}
