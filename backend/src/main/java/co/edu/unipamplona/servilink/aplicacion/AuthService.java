@@ -8,7 +8,6 @@ import co.edu.unipamplona.servilink.repositorio.UsuarioRepositorio;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.Locale;
-import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.JwsHeader;
@@ -45,7 +44,7 @@ public class AuthService {
     public Usuario registrar(String rol, String nombre, String correo, String telefono, String clave) {
         String correoNormal = correo.trim().toLowerCase(Locale.ROOT);
         if (usuarios.findByCorreo(correoNormal).isPresent()) {
-            throw new ErrorNegocio(HttpStatus.CONFLICT, "Correo registrado", "Ya existe una cuenta con ese correo");
+            throw new ErrorNegocio(Codigo.EMAIL_ALREADY_REGISTERED, "Ya existe una cuenta con ese correo");
         }
         Usuario u = usuarios.save(new Usuario(rol, nombre.trim(), correoNormal, telefono.trim(),
                 codificador.encode(clave)));
@@ -59,10 +58,10 @@ public class AuthService {
     public Sesion iniciarSesion(String correo, String clave) {
         Usuario u = usuarios.findByCorreo(correo.trim().toLowerCase(Locale.ROOT)).orElse(null);
         if (u == null || !codificador.matches(clave, u.getPasswordHash())) {
-            throw new ErrorNegocio(HttpStatus.UNAUTHORIZED, "No autenticado", "Correo o clave incorrectos");
+            throw new ErrorNegocio(Codigo.UNAUTHENTICATED, "Correo o clave incorrectos");
         }
         if (u.isSuspendido()) {
-            throw new ErrorNegocio(HttpStatus.FORBIDDEN, "Cuenta suspendida", "Tu cuenta está suspendida; contacta al administrador");
+            throw new ErrorNegocio(Codigo.ACCOUNT_SUSPENDED, "Tu cuenta está suspendida; contacta al administrador");
         }
         var ahora = reloj.instant();
         var claims = JwtClaimsSet.builder().subject(String.valueOf(u.getId())).claim("rol", u.getRol())
@@ -70,6 +69,14 @@ public class AuthService {
         String token = jwt.encode(JwtEncoderParameters.from(JwsHeader.with(MacAlgorithm.HS256).build(), claims))
                 .getTokenValue();
         return new Sesion(token, config.tokenVigenciaSeg(), u.getId(), u.getRol(), u.getNombre());
+    }
+
+    public record Perfil(Long id, String rol, String nombre, String correo, String telefono) {}
+
+    @Transactional(readOnly = true)
+    public Perfil perfil(Long usuarioId) {
+        Usuario u = usuarios.findById(usuarioId).orElseThrow(() -> new ErrorNegocio(Codigo.NOT_FOUND, "Usuario inexistente"));
+        return new Perfil(u.getId(), u.getRol(), u.getNombre(), u.getCorreo(), u.getTelefono());
     }
 
     /** Crea la cuenta de administrador inicial si no existe. Devuelve true si la creó. */

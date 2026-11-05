@@ -49,8 +49,9 @@ for nombre, s in spec["components"]["schemas"].items():
     c = campos(s)
     if c:
         print(f"   Esquema {nombre} contiene datos sensibles:", c)
-    if c and nombre not in ("ContactoAsignado",):
+    # Datos propios (perfil, registro) o de uso exclusivo del administrador (UsuarioAdmin); nunca en listados públicos.
+    if c and nombre not in ("ContactoAsignado", "PerfilResponse", "RegistroRequest", "UsuarioAdmin"):
         fallos.append(f"{nombre} expone {c}")
-print("3) Datos personales solo en ContactoAsignado (visible desde E03)")
+print("3) Datos personales solo en ContactoAsignado (visible desde E03), el perfil propio y la vista del administrador")
 print("FALLOS:", fallos if fallos else "ninguno")
 sys.exit(1 if fallos else 0)

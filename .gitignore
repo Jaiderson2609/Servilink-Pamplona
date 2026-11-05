@@ -7,3 +7,6 @@ negociacion/out/
 *.class
 .env
 experimentos/
+
+node_modules/
+frontend/dist/

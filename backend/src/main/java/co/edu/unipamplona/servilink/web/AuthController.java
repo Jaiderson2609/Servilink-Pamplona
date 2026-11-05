@@ -17,7 +17,7 @@ public class AuthController {
         this.auth = auth;
     }
 
-    @PostMapping("/registro")
+    @PostMapping("/register")
     public ResponseEntity<Map<String, Object>> registro(@Valid @RequestBody Peticiones.Registro r) {
         var u = auth.registrar(r.rol(), r.nombre(), r.correo(), r.telefono(), r.clave());
         return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("id", u.getId(), "rol", u.getRol()));

@@ -51,6 +51,7 @@ public abstract class PruebaIntegracion {
             disponible = c.isValid(2);
         } catch (Exception e) {
             disponible = false;
+            System.err.println("AVISO: no se pudo conectar a " + url + " con el usuario '" + usuario + "': " + e);
         }
         Assumptions.assumeTrue(disponible, "PostgreSQL no disponible: se omiten las pruebas de integración");
     }
@@ -94,6 +95,12 @@ public abstract class PruebaIntegracion {
                 .issuedAt(ahora).expiresAt(ahora.plus(Duration.ofHours(1))).build();
         return codificador.encode(JwtEncoderParameters.from(JwsHeader.with(MacAlgorithm.HS256).build(), claims))
                 .getTokenValue();
+    }
+
+    /** Id de postulación contenido en el cuerpo producido por cuerpo(); la API ahora lo recibe en la ruta. */
+    protected static String posDe(String cuerpo) {
+        var m = java.util.regex.Pattern.compile("(\\d+|abc)").matcher(cuerpo);
+        return m.find() ? m.group(1) : "abc";
     }
 
     protected String cuerpo(long postulacionId) {

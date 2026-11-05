@@ -9,7 +9,6 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,7 +36,7 @@ public class BilleteraService {
     @Transactional(readOnly = true)
     public Estado consultar(Long tecnicoId) {
         Billetera b = billeteras.findById(tecnicoId).orElseThrow(() ->
-                new ErrorNegocio(HttpStatus.NOT_FOUND, "No encontrado", "El técnico no tiene billetera"));
+                new ErrorNegocio(Codigo.NOT_FOUND, "El técnico no tiene billetera"));
         var movs = libro.findTop20ByTecnicoIdOrderByIdDesc(tecnicoId).stream()
                 .map(m -> new Mov(m.getId(), m.getTipo(), m.getValor(), m.getCreadoEn(), m.getSolicitudId(),
                         m.getSaldoPosterior())).toList();
@@ -51,10 +50,10 @@ public class BilleteraService {
     @Transactional
     public Estado recargarDemo(Long tecnicoId, long valor) {
         if (!config.recargaDemoHabilitada()) {
-            throw new ErrorNegocio(HttpStatus.NOT_FOUND, "No encontrado", "La recarga de demostración está desactivada");
+            throw new ErrorNegocio(Codigo.NOT_FOUND, "La recarga de demostración está desactivada");
         }
         Billetera b = billeteras.bloquear(tecnicoId).orElseThrow(() ->
-                new ErrorNegocio(HttpStatus.NOT_FOUND, "No encontrado", "El técnico no tiene billetera"));
+                new ErrorNegocio(Codigo.NOT_FOUND, "El técnico no tiene billetera"));
         b.recargar(valor);
         libro.save(new Movimiento(tecnicoId, null, "RECARGA", valor, b.getDisponible(),
                 "REC-" + UUID.randomUUID(), reloj.instant()));

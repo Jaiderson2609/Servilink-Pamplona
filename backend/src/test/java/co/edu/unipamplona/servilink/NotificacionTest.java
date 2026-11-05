@@ -2,7 +2,7 @@ package co.edu.unipamplona.servilink;
 
 import static co.edu.unipamplona.servilink.apoyo.ConfiguracionPruebas.T0;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import co.edu.unipamplona.servilink.aplicacion.NotificacionService;
@@ -28,8 +28,8 @@ class NotificacionTest extends PruebaIntegracion {
     }
 
     void asignar() throws Exception {
-        mvc.perform(post("/api/v1/solicitudes/" + sol + "/asignacion").header("Authorization", "Bearer " + token("HOGAR", hogar))
-                .contentType(MediaType.APPLICATION_JSON).content(cuerpo(pos))).andExpect(status().isOk());
+        mvc.perform(patch("/api/v1/applications/" + pos + "/select").header("Authorization", "Bearer " + token("HOGAR", hogar))
+                .contentType(MediaType.APPLICATION_JSON)).andExpect(status().isOk());
     }
 
     String estado() { return jdbc.queryForObject("SELECT estado FROM notificaciones_pendientes", String.class); }

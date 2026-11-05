@@ -2,7 +2,7 @@ package co.edu.unipamplona.servilink;
 
 import static co.edu.unipamplona.servilink.apoyo.ConfiguracionPruebas.T0;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 
 import co.edu.unipamplona.servilink.apoyo.PruebaIntegracion;
 import java.time.Duration;
@@ -20,9 +20,9 @@ class ConcurrenciaTest extends PruebaIntegracion {
 
     int pedir(long solicitudId, long postulacionId, String token, CountDownLatch salida) throws Exception {
         salida.await();
-        return mvc.perform(post("/api/v1/solicitudes/" + solicitudId + "/asignacion")
+        return mvc.perform(patch("/api/v1/applications/" + postulacionId + "/select")
                         .header("Authorization", "Bearer " + token)
-                        .contentType(MediaType.APPLICATION_JSON).content(cuerpo(postulacionId)))
+                        .contentType(MediaType.APPLICATION_JSON))
                 .andReturn().getResponse().getStatus();
     }
 

@@ -39,7 +39,9 @@ jobs:
           javac -Xlint:all -Werror -encoding UTF-8 -d "$RUNNER_TEMP/lint" \
             negociacion/src/servilink/negociacion/*.java
       - name: Contrato OpenAPI (esquema, seguridad y privacidad)
-        run: python contrato/validar.py contrato/openapi.yaml
+        run: |
+          python contrato/validar.py contrato/openapi.yaml
+          python contrato/validar.py contrato/openapi-referencia.yaml
 
   test:
     name: 2 · Pruebas y cobertura
@@ -81,6 +83,34 @@ jobs:
           name: cobertura
           path: backend-ref/coverage.xml
 
+  backend-spring:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgis/postgis:17-3.5
+        env: { POSTGRES_DB: servilink_test, POSTGRES_PASSWORD: ci-password }
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-retries 10
+    env:
+      TEST_POSTGRES_URL: jdbc:postgresql://localhost:5432/servilink_test
+      TEST_POSTGRES_USER: postgres
+      TEST_POSTGRES_PASSWORD: ci-password
+      JWT_SECRET: ci-secreto-de-pruebas-con-mas-de-32-caracteres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: "21", cache: maven }
+      - run: mvn -B verify
+        working-directory: backend
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "22", cache: npm, cache-dependency-path: frontend/package-lock.json }
+      - run: npm ci && npm test && npm run build
+        working-directory: frontend
   analysis:
     name: 3 · Análisis estático y Quality Gate
     needs: test

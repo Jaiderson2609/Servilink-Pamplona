@@ -12,7 +12,6 @@ import java.util.function.Function;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -88,7 +87,7 @@ public class AdministracionService {
     public UsuarioAdmin suspender(Long adminId, Long usuarioId, String motivo) {
         Usuario u = usuarios.findById(usuarioId).orElseThrow(() -> noEncontrado("Usuario inexistente"));
         if ("ADMIN".equals(u.getRol())) {
-            throw new ErrorNegocio(HttpStatus.CONFLICT, "Operacion no permitida", "No se puede suspender a un administrador");
+            throw new ErrorNegocio(Codigo.OPERATION_NOT_ALLOWED, "No se puede suspender a un administrador");
         }
         if (!u.isSuspendido()) {
             u.suspender(motivo.trim(), reloj.instant());
@@ -171,10 +170,10 @@ public class AdministracionService {
     }
 
     private static ErrorNegocio invalida(String detalle) {
-        return new ErrorNegocio(HttpStatus.BAD_REQUEST, "Solicitud invalida", detalle);
+        return new ErrorNegocio(Codigo.VALIDATION_ERROR, detalle);
     }
 
     private static ErrorNegocio noEncontrado(String detalle) {
-        return new ErrorNegocio(HttpStatus.NOT_FOUND, "No encontrado", detalle);
+        return new ErrorNegocio(Codigo.NOT_FOUND, detalle);
     }
 }

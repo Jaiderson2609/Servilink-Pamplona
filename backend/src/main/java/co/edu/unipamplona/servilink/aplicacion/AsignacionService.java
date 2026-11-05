@@ -8,7 +8,6 @@ import java.math.RoundingMode;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -42,19 +41,26 @@ public class AsignacionService {
         this.reloj = reloj;
     }
 
+    /** Solicitud a la que pertenece una postulación; la autorización la decide asignar() con el bloqueo tomado. */
+    @Transactional(readOnly = true)
+    public Long solicitudDe(Long postulacionId) {
+        return postulaciones.findById(postulacionId).map(Postulacion::getSolicitudId)
+                .orElseThrow(() -> new ErrorNegocio(Codigo.NOT_FOUND, "Postulación inexistente"));
+    }
+
     @Transactional
     public Resultado asignar(Long hogarId, Long solicitudId, Long postulacionId) {
         // Bloqueo pesimista: dos asignaciones simultáneas de la misma solicitud se ejecutan una tras otra.
         Solicitud sol = solicitudes.bloquear(solicitudId)
-                .orElseThrow(() -> new ErrorNegocio(HttpStatus.NOT_FOUND, "No encontrado", "Solicitud inexistente"));
+                .orElseThrow(() -> new ErrorNegocio(Codigo.NOT_FOUND, "Solicitud inexistente"));
         if (!sol.getHogarId().equals(hogarId)) {
-            throw new ErrorNegocio(HttpStatus.FORBIDDEN, "Sin permiso", "La solicitud es de otro hogar");
+            throw new ErrorNegocio(Codigo.FORBIDDEN, "La solicitud es de otro hogar");
         }
         Postulacion pos = postulaciones.findById(postulacionId)
                 .filter(p -> p.getSolicitudId().equals(sol.getId()))
-                .orElseThrow(() -> new ErrorNegocio(HttpStatus.NOT_FOUND, "No encontrado", "Postulación inexistente"));
+                .orElseThrow(() -> new ErrorNegocio(Codigo.NOT_FOUND, "Postulación inexistente"));
         Billetera billetera = billeteras.bloquear(pos.getTecnicoId())
-                .orElseThrow(() -> new ErrorNegocio(HttpStatus.NOT_FOUND, "No encontrado", "El técnico no tiene billetera"));
+                .orElseThrow(() -> new ErrorNegocio(Codigo.NOT_FOUND, "El técnico no tiene billetera"));
         Usuario tecnico = usuarios.findById(pos.getTecnicoId()).orElseThrow();
 
         if ("E03".equals(sol.getEstado()) && pos.getTecnicoId().equals(sol.getTecnicoId())) {
@@ -62,19 +68,18 @@ public class AsignacionService {
             return new Resultado(sol.getId(), sol.getComisionCop(), tecnico.getNombre(), tecnico.getTelefono(), null);
         }
         if (!"E02".equals(sol.getEstado())) {
-            throw new ErrorNegocio(HttpStatus.CONFLICT, "Estado invalido", "La solicitud está en " + sol.getEstado());
+            throw new ErrorNegocio(Codigo.INVALID_STATE_TRANSITION, "La solicitud está en " + sol.getEstado());
         }
         Instant ahora = reloj.instant();
         if (!ahora.isBefore(sol.getExpiraEn())) { // RN-02: el servidor decide con su propio reloj
-            throw new ErrorNegocio(HttpStatus.CONFLICT, "Ventana expirada", "La ventana de selección terminó");
+            throw new ErrorNegocio(Codigo.SERVICE_EXPIRED, "La ventana de selección terminó");
         }
         if (solicitudes.existsByTecnicoIdAndEstadoIn(pos.getTecnicoId(), List.of("E03", "E04"))) { // RN-07
-            throw new ErrorNegocio(HttpStatus.CONFLICT, "Tecnico ocupado", "El técnico ya tiene un servicio activo");
+            throw new ErrorNegocio(Codigo.TECHNICIAN_UNAVAILABLE, "El técnico ya tiene un servicio activo");
         }
         long comision = comision(pos.getPrecio(), config.comision());
         if (billetera.getDisponible() < comision) {
-            throw new ErrorNegocio(HttpStatus.UNPROCESSABLE_ENTITY, "Saldo insuficiente",
-                    "No alcanza para retener la comisión");
+            throw new ErrorNegocio(Codigo.INSUFFICIENT_BALANCE, "No alcanza para retener la comisión");
         }
         billetera.retener(comision);
         libro.save(new Movimiento(billetera.getTecnicoId(), sol.getId(), "RETENCION", comision,

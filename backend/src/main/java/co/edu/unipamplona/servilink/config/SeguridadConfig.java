@@ -24,7 +24,8 @@ import org.springframework.security.web.SecurityFilterChain;
 public class SeguridadConfig {
 
     @Bean
-    SecurityFilterChain cadena(HttpSecurity http) throws Exception {
+    SecurityFilterChain cadena(HttpSecurity http, org.springframework.jdbc.core.JdbcTemplate jdbc, java.time.Clock reloj)
+            throws Exception {
         var autoridades = new JwtGrantedAuthoritiesConverter();
         autoridades.setAuthoritiesClaimName("rol");
         autoridades.setAuthorityPrefix("ROLE_");
@@ -35,25 +36,37 @@ public class SeguridadConfig {
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(a -> a
                         .requestMatchers("/actuator/health", "/api/v1/auth/**").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/v1/solicitudes").hasRole("HOGAR")
-                        .requestMatchers(HttpMethod.POST, "/api/v1/solicitudes/*/asignacion").hasRole("HOGAR")
-                        .requestMatchers(HttpMethod.GET, "/api/v1/solicitudes/*/postulaciones").hasRole("HOGAR")
-                        .requestMatchers(HttpMethod.POST, "/api/v1/solicitudes/*/confirmacion").hasRole("HOGAR")
-                        .requestMatchers(HttpMethod.POST, "/api/v1/solicitudes/*/postulaciones").hasRole("TECNICO")
-                        .requestMatchers(HttpMethod.POST, "/api/v1/solicitudes/*/llegada").hasRole("TECNICO")
-                        .requestMatchers(HttpMethod.POST, "/api/v1/solicitudes/*/trabajo-terminado").hasRole("TECNICO")
-                        .requestMatchers(HttpMethod.POST, "/api/v1/solicitudes/*/cancelacion").hasAnyRole("HOGAR", "TECNICO")
-                        .requestMatchers(HttpMethod.GET, "/api/v1/solicitudes/abiertas").hasRole("TECNICO")
+                        // La plataforma web (React compilado: página, assets, manifiesto y service worker) es pública; todo lo sensible vive detrás de /api.
+                        .requestMatchers(HttpMethod.GET, "/", "/index.html", "/favicon.svg", "/manifest.webmanifest", "/sw.js",
+                                "/assets/**", "/icons/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/service-requests").hasRole("HOGAR")
+                        .requestMatchers(HttpMethod.PATCH, "/api/v1/applications/*/select").hasRole("HOGAR")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/service-requests/*/applications").hasRole("HOGAR")
+                        .requestMatchers(HttpMethod.PATCH, "/api/v1/service-requests/*/confirm").hasRole("HOGAR")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/service-requests/*/applications").hasRole("TECNICO")
+                        .requestMatchers(HttpMethod.PATCH, "/api/v1/service-requests/*/arrive").hasRole("TECNICO")
+                        .requestMatchers(HttpMethod.PATCH, "/api/v1/service-requests/*/complete").hasRole("TECNICO")
+                        .requestMatchers(HttpMethod.PATCH, "/api/v1/service-requests/*/cancel").hasAnyRole("HOGAR", "TECNICO")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/service-requests/open").hasRole("TECNICO")
                         .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
-                        .requestMatchers("/api/v1/tecnicos/yo/**").hasRole("TECNICO")
-                        .requestMatchers("/api/v1/billetera/**", "/api/v1/billetera").hasRole("TECNICO")
+                        .requestMatchers("/api/v1/technicians/me/**").hasRole("TECNICO")
+                        .requestMatchers("/api/v1/wallet/**", "/api/v1/wallet").hasRole("TECNICO")
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(o -> o
                         .jwt(j -> j.jwtAuthenticationConverter(convertidor))
-                        .authenticationEntryPoint((req, res, e) -> problema(res, 401, "No autenticado",
+                        .authenticationEntryPoint((req, res, e) -> error(res, 401, "UNAUTHENTICATED",
                                 "Token ausente, vencido o inválido")))
-                .exceptionHandling(h -> h.accessDeniedHandler((req, res, e) -> problema(res, 403, "Sin permiso",
+                .exceptionHandling(h -> h.accessDeniedHandler((req, res, e) -> error(res, 403, "FORBIDDEN",
                         "No tienes permiso para esta operación")))
+                .addFilterAfter(new FiltroIdempotencia(jdbc, reloj),
+                        org.springframework.security.web.access.intercept.AuthorizationFilter.class)
+                .headers(h -> h
+                        .contentSecurityPolicy(c -> c.policyDirectives("default-src 'self'; script-src 'self'; style-src 'self'; "
+                                + "img-src 'self' blob: data: https://tile.openstreetmap.org; connect-src 'self'; object-src 'none'; base-uri 'none'; "
+                                + "form-action 'self'; frame-ancestors 'none'"))
+                        .frameOptions(f -> f.deny())
+                        .referrerPolicy(r -> r.policy(
+                                org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy.NO_REFERRER)))
                 .cors(Customizer.withDefaults());
         return http.build();
     }
@@ -95,13 +108,12 @@ public class SeguridadConfig {
         return new BCryptPasswordEncoder();
     }
 
-    private static void problema(HttpServletResponse res, int estado, String titulo, String detalle)
+    private static void error(HttpServletResponse res, int estado, String codigo, String mensaje)
             throws java.io.IOException {
         res.setStatus(estado);
-        res.setContentType("application/problem+json");
+        res.setContentType("application/json");
         res.setCharacterEncoding("UTF-8");
-        String tipo = "https://servilink.co/errores/" + titulo.toLowerCase().replace(' ', '-');
-        res.getWriter().write("{\"type\":\"" + tipo + "\",\"title\":\"" + titulo + "\",\"status\":" + estado
-                + ",\"detail\":\"" + detalle + "\"}");
+        res.getWriter().write("{\"code\":\"" + codigo + "\",\"message\":\"" + mensaje + "\",\"traceId\":\""
+                + java.util.UUID.randomUUID() + "\"}");
     }
 }

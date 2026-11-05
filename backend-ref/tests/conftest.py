@@ -42,7 +42,7 @@ def token(rol="HOGAR", sub=7, vigente=True):
 
 @pytest.fixture
 def contrato():
-    return yaml.safe_load((RAIZ.parent / "contrato" / "openapi.yaml").read_text(encoding="utf8"))
+    return yaml.safe_load((RAIZ.parent / "contrato" / "openapi-referencia.yaml").read_text(encoding="utf8"))
 
 
 @pytest.fixture

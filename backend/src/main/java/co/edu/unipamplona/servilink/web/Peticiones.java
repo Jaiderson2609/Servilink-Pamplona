@@ -3,7 +3,7 @@ package co.edu.unipamplona.servilink.web;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 
-/** Cuerpos de las peticiones. Los mensajes de validación se devuelven en el campo detail del problema. */
+/** Cuerpos de las peticiones. Los mensajes de validación se devuelven en el campo message del error. */
 public final class Peticiones {
     private Peticiones() {}
 
@@ -48,6 +48,10 @@ public final class Peticiones {
     public record CalificacionCrear(
             @NotNull(message = "las estrellas son obligatorias") @Min(value = 1, message = "las estrellas van de 1 a 5") @Max(value = 5, message = "las estrellas van de 1 a 5") Integer estrellas,
             @Size(max = 300, message = "el comentario admite hasta 300 caracteres") String comentario) {}
+
+    public record EstadoCuenta(
+            @NotNull(message = "status es obligatorio") @Pattern(regexp = "ACTIVE|SUSPENDED", message = "status debe ser ACTIVE o SUSPENDED") String status,
+            String reason) {}
 
     public record MotivoAdmin(
             @NotBlank(message = "el motivo es obligatorio") @Size(min = 5, max = 200, message = "el motivo debe tener entre 5 y 200 caracteres") String motivo) {}

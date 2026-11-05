@@ -25,22 +25,22 @@ class ReglasFlujoTest extends PruebaApi {
     }
 
     long crear(String token, String descripcion) throws Exception {
-        return ((Number) campo(enviar(token, "/api/v1/solicitudes", solicitudJson(descripcion)), "$.id")).longValue();
+        return ((Number) campo(enviar(token, "/api/v1/service-requests", solicitudJson(descripcion)), "$.id")).longValue();
     }
 
     @Test
     void unHogarSoloPuedeTenerUnaSolicitudActiva() throws Exception {
         crear(hogar, "Cambiar un tomacorriente roto");
-        enviar(hogar, "/api/v1/solicitudes", solicitudJson("Otra solicitud al mismo tiempo")).andExpect(status().isConflict())
-                .andExpect(jsonPath("$.title").value("Solicitud activa"));
+        enviar(hogar, "/api/v1/service-requests", solicitudJson("Otra solicitud al mismo tiempo")).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("ACTIVE_REQUEST_EXISTS"));
     }
 
     @Test
     void validaLaDescripcionElOficioYLaUbicacion() throws Exception {
-        enviar(hogar, "/api/v1/solicitudes", solicitudJson("corta")).andExpect(status().isBadRequest());
-        enviar(hogar, "/api/v1/solicitudes", "{\"oficioId\":99,\"descripcion\":\"Descripción suficiente\",\"ubicacion\":{\"lat\":7.3,\"lng\":-72.6}}")
+        enviar(hogar, "/api/v1/service-requests", solicitudJson("corta")).andExpect(status().isBadRequest());
+        enviar(hogar, "/api/v1/service-requests", "{\"oficioId\":99,\"descripcion\":\"Descripción suficiente\",\"ubicacion\":{\"lat\":7.3,\"lng\":-72.6}}")
                 .andExpect(status().isBadRequest());
-        enviar(hogar, "/api/v1/solicitudes", "{\"oficioId\":2,\"descripcion\":\"Descripción suficiente\",\"ubicacion\":{\"lat\":95,\"lng\":-72.6}}")
+        enviar(hogar, "/api/v1/service-requests", "{\"oficioId\":2,\"descripcion\":\"Descripción suficiente\",\"ubicacion\":{\"lat\":95,\"lng\":-72.6}}")
                 .andExpect(status().isBadRequest());
     }
 
@@ -48,7 +48,7 @@ class ReglasFlujoTest extends PruebaApi {
     void laPrimeraPostulacionAbreLaVentanaDeEleccionDeCincoMinutos() throws Exception {
         long sol = crear(hogar, "Cambiar un tomacorriente roto");
         reloj.fijar(ConfiguracionPruebas.T0.plus(Duration.ofMinutes(3)));
-        enviar(tecnico, "/api/v1/solicitudes/" + sol + "/postulaciones", "{\"precioCop\":20000}").andExpect(status().isCreated());
+        enviar(tecnico, "/api/v1/service-requests/" + sol + "/applications", "{\"precioCop\":20000}").andExpect(status().isCreated());
         var expira = jdbc.queryForObject("SELECT expira_en FROM solicitudes WHERE id = ?", java.sql.Timestamp.class, sol).toInstant();
         assertThat(expira).isEqualTo(ConfiguracionPruebas.T0.plus(Duration.ofMinutes(8)));
     }
@@ -57,18 +57,18 @@ class ReglasFlujoTest extends PruebaApi {
     void noSePuedePostularEnElInstanteExactoDeExpirarLaVentana() throws Exception {
         long sol = crear(hogar, "Cambiar un tomacorriente roto");
         reloj.fijar(ConfiguracionPruebas.T0.plus(Duration.ofMinutes(10)));
-        enviar(tecnico, "/api/v1/solicitudes/" + sol + "/postulaciones", "{\"precioCop\":20000}").andExpect(status().isConflict())
-                .andExpect(jsonPath("$.title").value("Ventana expirada"));
+        enviar(tecnico, "/api/v1/service-requests/" + sol + "/applications", "{\"precioCop\":20000}").andExpect(status().isGone())
+                .andExpect(jsonPath("$.code").value("SERVICE_EXPIRED"));
         reloj.fijar(ConfiguracionPruebas.T0.plus(Duration.ofMinutes(10)).minusSeconds(1));
-        enviar(tecnico, "/api/v1/solicitudes/" + sol + "/postulaciones", "{\"precioCop\":20000}").andExpect(status().isCreated());
+        enviar(tecnico, "/api/v1/service-requests/" + sol + "/applications", "{\"precioCop\":20000}").andExpect(status().isCreated());
     }
 
     @Test
     void cadaTecnicoSePostulaUnaSolaVez() throws Exception {
         long sol = crear(hogar, "Cambiar un tomacorriente roto");
-        enviar(tecnico, "/api/v1/solicitudes/" + sol + "/postulaciones", "{\"precioCop\":20000}").andExpect(status().isCreated());
-        enviar(tecnico, "/api/v1/solicitudes/" + sol + "/postulaciones", "{\"precioCop\":15000}").andExpect(status().isConflict())
-                .andExpect(jsonPath("$.title").value("Postulacion duplicada"));
+        enviar(tecnico, "/api/v1/service-requests/" + sol + "/applications", "{\"precioCop\":20000}").andExpect(status().isCreated());
+        enviar(tecnico, "/api/v1/service-requests/" + sol + "/applications", "{\"precioCop\":15000}").andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("DUPLICATE_APPLICATION"));
     }
 
     @Test
@@ -76,64 +76,64 @@ class ReglasFlujoTest extends PruebaApi {
         String pobre = cuenta("TECNICO", "pobre@correo.co");
         recargar(pobre, 39_000);
         long sol = crear(hogar, "Cambiar un tomacorriente roto");
-        enviar(pobre, "/api/v1/solicitudes/" + sol + "/postulaciones", "{\"precioCop\":20000}").andExpect(status().isUnprocessableEntity())
-                .andExpect(jsonPath("$.title").value("Saldo insuficiente"));
+        enviar(pobre, "/api/v1/service-requests/" + sol + "/applications", "{\"precioCop\":20000}").andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value("WALLET_BELOW_MINIMUM"));
         recargar(pobre, 1_000);
-        enviar(pobre, "/api/v1/solicitudes/" + sol + "/postulaciones", "{\"precioCop\":20000}").andExpect(status().isCreated());
+        enviar(pobre, "/api/v1/service-requests/" + sol + "/applications", "{\"precioCop\":20000}").andExpect(status().isCreated());
     }
 
     @Test
     void elPrecioDebeSerRazonable() throws Exception {
         long sol = crear(hogar, "Cambiar un tomacorriente roto");
-        enviar(tecnico, "/api/v1/solicitudes/" + sol + "/postulaciones", "{\"precioCop\":999}").andExpect(status().isBadRequest());
-        enviar(tecnico, "/api/v1/solicitudes/" + sol + "/postulaciones", "{}").andExpect(status().isBadRequest());
+        enviar(tecnico, "/api/v1/service-requests/" + sol + "/applications", "{\"precioCop\":999}").andExpect(status().isBadRequest());
+        enviar(tecnico, "/api/v1/service-requests/" + sol + "/applications", "{}").andExpect(status().isBadRequest());
     }
 
     @Test
     void noSePostulaAUnaSolicitudYaAsignadaNiInexistente() throws Exception {
         long sol = crear(hogar, "Cambiar un tomacorriente roto");
-        long pos = ((Number) campo(enviar(tecnico, "/api/v1/solicitudes/" + sol + "/postulaciones", "{\"precioCop\":20000}"), "$.id")).longValue();
-        enviar(hogar, "/api/v1/solicitudes/" + sol + "/asignacion", "{\"postulacionId\":" + pos + "}").andExpect(status().isOk());
+        long pos = ((Number) campo(enviar(tecnico, "/api/v1/service-requests/" + sol + "/applications", "{\"precioCop\":20000}"), "$.id")).longValue();
+        enviar(hogar, "/api/v1/applications/" + pos + "/select", null).andExpect(status().isOk());
         String otro = cuenta("TECNICO", "otro@correo.co");
         recargar(otro, 50_000);
-        enviar(otro, "/api/v1/solicitudes/" + sol + "/postulaciones", "{\"precioCop\":18000}").andExpect(status().isConflict());
-        enviar(otro, "/api/v1/solicitudes/9999/postulaciones", "{\"precioCop\":18000}").andExpect(status().isNotFound());
+        enviar(otro, "/api/v1/service-requests/" + sol + "/applications", "{\"precioCop\":18000}").andExpect(status().isConflict());
+        enviar(otro, "/api/v1/service-requests/9999/applications", "{\"precioCop\":18000}").andExpect(status().isNotFound());
     }
 
     @Test
     void unTecnicoConServicioActivoNoPuedePostularseAOtro() throws Exception {
         long sol = crear(hogar, "Cambiar un tomacorriente roto");
-        long pos = ((Number) campo(enviar(tecnico, "/api/v1/solicitudes/" + sol + "/postulaciones", "{\"precioCop\":20000}"), "$.id")).longValue();
-        enviar(hogar, "/api/v1/solicitudes/" + sol + "/asignacion", "{\"postulacionId\":" + pos + "}").andExpect(status().isOk());
+        long pos = ((Number) campo(enviar(tecnico, "/api/v1/service-requests/" + sol + "/applications", "{\"precioCop\":20000}"), "$.id")).longValue();
+        enviar(hogar, "/api/v1/applications/" + pos + "/select", null).andExpect(status().isOk());
         String hogar2 = cuenta("HOGAR", "hogar2@correo.co");
         long sol2 = crear(hogar2, "Revisar la instalación de gas");
-        enviar(tecnico, "/api/v1/solicitudes/" + sol2 + "/postulaciones", "{\"precioCop\":25000}").andExpect(status().isConflict())
-                .andExpect(jsonPath("$.title").value("Tecnico ocupado"));
+        enviar(tecnico, "/api/v1/service-requests/" + sol2 + "/applications", "{\"precioCop\":25000}").andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("TECHNICIAN_UNAVAILABLE"));
     }
 
     @Test
     void cancelarEnE01Ye02EsLibreYNoCobraNada() throws Exception {
         long sol = crear(hogar, "Cambiar un tomacorriente roto");
-        enviar(hogar, "/api/v1/solicitudes/" + sol + "/cancelacion", null).andExpect(status().isOk()).andExpect(jsonPath("$.estado").value("E07"));
+        enviar(hogar, "/api/v1/service-requests/" + sol + "/cancel", null).andExpect(status().isOk()).andExpect(jsonPath("$.estado").value("E07"));
         assertThat(jdbc.queryForObject("SELECT count(*) FROM libro_contable WHERE tipo <> 'RECARGA'", Integer.class)).isZero();
         long otra = crear(hogar, "Una solicitud nueva, ahora sí");
-        enviar(tecnico, "/api/v1/solicitudes/" + otra + "/postulaciones", "{\"precioCop\":20000}").andExpect(status().isCreated());
-        enviar(hogar, "/api/v1/solicitudes/" + otra + "/cancelacion", "{\"motivo\":\"\"}").andExpect(status().isOk());
+        enviar(tecnico, "/api/v1/service-requests/" + otra + "/applications", "{\"precioCop\":20000}").andExpect(status().isCreated());
+        enviar(hogar, "/api/v1/service-requests/" + otra + "/cancel", "{\"motivo\":\"\"}").andExpect(status().isOk());
     }
 
     @Test
     void soloElDuenoCancelaYSoloElTecnicoAsignadoAvanza() throws Exception {
         long sol = crear(hogar, "Cambiar un tomacorriente roto");
         String intruso = cuenta("HOGAR", "intruso@correo.co");
-        enviar(intruso, "/api/v1/solicitudes/" + sol + "/cancelacion", null).andExpect(status().isForbidden());
-        enviar(tecnico, "/api/v1/solicitudes/" + sol + "/cancelacion", null).andExpect(status().isForbidden());
-        long pos = ((Number) campo(enviar(tecnico, "/api/v1/solicitudes/" + sol + "/postulaciones", "{\"precioCop\":20000}"), "$.id")).longValue();
-        enviar(hogar, "/api/v1/solicitudes/" + sol + "/asignacion", "{\"postulacionId\":" + pos + "}").andExpect(status().isOk());
+        enviar(intruso, "/api/v1/service-requests/" + sol + "/cancel", null).andExpect(status().isForbidden());
+        enviar(tecnico, "/api/v1/service-requests/" + sol + "/cancel", null).andExpect(status().isForbidden());
+        long pos = ((Number) campo(enviar(tecnico, "/api/v1/service-requests/" + sol + "/applications", "{\"precioCop\":20000}"), "$.id")).longValue();
+        enviar(hogar, "/api/v1/applications/" + pos + "/select", null).andExpect(status().isOk());
         String otro = cuenta("TECNICO", "otro@correo.co");
-        enviar(otro, "/api/v1/solicitudes/" + sol + "/llegada", null).andExpect(status().isForbidden());
-        enviar(tecnico, "/api/v1/solicitudes/" + sol + "/trabajo-terminado", null).andExpect(status().isConflict()); // aún en E03
-        enviar(intruso, "/api/v1/solicitudes/" + sol + "/confirmacion", null).andExpect(status().isForbidden());
-        pedir(intruso, "/api/v1/solicitudes/" + sol).andExpect(status().isForbidden());
+        enviar(otro, "/api/v1/service-requests/" + sol + "/arrive", null).andExpect(status().isForbidden());
+        enviar(tecnico, "/api/v1/service-requests/" + sol + "/complete", null).andExpect(status().isConflict()); // aún en E03
+        enviar(intruso, "/api/v1/service-requests/" + sol + "/confirm", null).andExpect(status().isForbidden());
+        pedir(intruso, "/api/v1/service-requests/" + sol).andExpect(status().isForbidden());
     }
 
     @Test
@@ -142,7 +142,7 @@ class ReglasFlujoTest extends PruebaApi {
         reloj.fijar(ConfiguracionPruebas.T0.plus(Duration.ofMinutes(11)));
         assertThat(servicio.expirarVencidas()).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT estado FROM solicitudes WHERE id = ?", String.class, sol)).isEqualTo("E06");
-        pedir(tecnico, "/api/v1/solicitudes/abiertas").andExpect(jsonPath("$").isEmpty());
+        pedir(tecnico, "/api/v1/service-requests/open").andExpect(jsonPath("$").isEmpty());
         crear(hogar, "Una solicitud nueva después de expirar"); // RN-13: la vencida no se borra, se crea otra
         assertThat(jdbc.queryForObject("SELECT count(*) FROM solicitudes", Integer.class)).isEqualTo(2);
     }
@@ -151,20 +151,20 @@ class ReglasFlujoTest extends PruebaApi {
     void unaSolicitudVencidaNoBloqueaAlHogarAunqueNoHayaCorridoElBarrido() throws Exception {
         crear(hogar, "Cambiar un tomacorriente roto");
         reloj.fijar(ConfiguracionPruebas.T0.plus(Duration.ofMinutes(30)));
-        enviar(hogar, "/api/v1/solicitudes", solicitudJson("Otra solicitud mucho después")).andExpect(status().isUnauthorized()); // el token de 15 min venció
+        enviar(hogar, "/api/v1/service-requests", solicitudJson("Otra solicitud mucho después")).andExpect(status().isUnauthorized()); // el token de 15 min venció
         hogar = campo(enviar(null, "/api/v1/auth/login", "{\"correo\":\"hogar@correo.co\",\"clave\":\"clave-segura-1\"}"), "$.accessToken");
-        enviar(hogar, "/api/v1/solicitudes", solicitudJson("Otra solicitud mucho después")).andExpect(status().isCreated());
+        enviar(hogar, "/api/v1/service-requests", solicitudJson("Otra solicitud mucho después")).andExpect(status().isCreated());
     }
 
     @Test
     void lasSolicitudesDeCadaUsuarioSeListanAparte() throws Exception {
         crear(hogar, "Cambiar un tomacorriente roto");
-        pedir(hogar, "/api/v1/solicitudes/mias").andExpect(jsonPath("$.length()").value(1));
-        pedir(tecnico, "/api/v1/solicitudes/mias").andExpect(jsonPath("$.length()").value(0));
+        pedir(hogar, "/api/v1/service-requests/mine").andExpect(jsonPath("$.length()").value(1));
+        pedir(tecnico, "/api/v1/service-requests/mine").andExpect(jsonPath("$.length()").value(0));
     }
 
     @Test
     void elCatalogoDeOficiosTieneLasCincoCategoriasIniciales() throws Exception {
-        pedir(hogar, "/api/v1/oficios").andExpect(jsonPath("$.length()").value(5)).andExpect(jsonPath("$[0].nombre").value("Plomería"));
+        pedir(hogar, "/api/v1/trades").andExpect(jsonPath("$.length()").value(5)).andExpect(jsonPath("$[0].nombre").value("Plomería"));
     }
 }

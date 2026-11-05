@@ -2,17 +2,15 @@ package co.edu.unipamplona.servilink.aplicacion;
 
 import org.springframework.http.HttpStatus;
 
-/** Violación de una regla de negocio; se traduce a una respuesta application/problem+json. */
+/** Violación de una regla de negocio; se traduce a {code, message, traceId}. */
 public class ErrorNegocio extends RuntimeException {
-    private final HttpStatus estado;
-    private final String titulo;
+    private final Codigo codigo;
 
-    public ErrorNegocio(HttpStatus estado, String titulo, String detalle) {
+    public ErrorNegocio(Codigo codigo, String detalle) {
         super(detalle);
-        this.estado = estado;
-        this.titulo = titulo;
+        this.codigo = codigo;
     }
 
-    public HttpStatus estado() { return estado; }
-    public String titulo() { return titulo; }
+    public Codigo codigo() { return codigo; }
+    public HttpStatus estado() { return codigo.estado(); }
 }

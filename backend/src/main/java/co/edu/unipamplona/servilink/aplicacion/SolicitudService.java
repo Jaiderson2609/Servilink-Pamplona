@@ -7,7 +7,6 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -56,12 +55,12 @@ public class SolicitudService {
     @Transactional
     public Vista crear(Long hogarId, Integer oficioId, String descripcion, double lat, double lng) {
         if (!oficios.existsById(oficioId)) {
-            throw new ErrorNegocio(HttpStatus.BAD_REQUEST, "Solicitud invalida", "El oficio no existe");
+            throw new ErrorNegocio(Codigo.VALIDATION_ERROR, "El oficio no existe");
         }
         Instant ahora = reloj.instant();
         solicitudes.expirarVencidasDe(hogarId, ahora); // una solicitud vencida no debe bloquear una nueva
         if (solicitudes.existsByHogarIdAndEstadoIn(hogarId, ACTIVAS)) {
-            throw new ErrorNegocio(HttpStatus.CONFLICT, "Solicitud activa", "Ya tienes una solicitud en curso");
+            throw new ErrorNegocio(Codigo.ACTIVE_REQUEST_EXISTS, "Ya tienes una solicitud en curso");
         }
         Solicitud s = solicitudes.save(new Solicitud(hogarId, oficioId, descripcion.trim(), lat, lng,
                 ahora.plus(Duration.ofMinutes(config.ventanaPostulacionMin())), ahora));
@@ -73,22 +72,21 @@ public class SolicitudService {
     public VistaPostulacion postular(Long tecnicoId, Long solicitudId, int precio, String mensaje) {
         Solicitud s = solicitudes.bloquear(solicitudId).orElseThrow(SolicitudService::noEncontrada);
         if (!"E01".equals(s.getEstado()) && !"E02".equals(s.getEstado())) {
-            throw new ErrorNegocio(HttpStatus.CONFLICT, "Estado invalido", "La solicitud está en " + s.getEstado());
+            throw new ErrorNegocio(Codigo.INVALID_STATE_TRANSITION, "La solicitud está en " + s.getEstado());
         }
         Instant ahora = reloj.instant();
         if (!ahora.isBefore(s.getExpiraEn())) { // RN-03: decide el reloj del servidor
-            throw new ErrorNegocio(HttpStatus.CONFLICT, "Ventana expirada", "La ventana de postulación terminó");
+            throw new ErrorNegocio(Codigo.SERVICE_EXPIRED, "La ventana de postulación terminó");
         }
         if (postulaciones.existsBySolicitudIdAndTecnicoId(solicitudId, tecnicoId)) { // RN-08
-            throw new ErrorNegocio(HttpStatus.CONFLICT, "Postulacion duplicada", "Ya te postulaste a esta solicitud");
+            throw new ErrorNegocio(Codigo.DUPLICATE_APPLICATION, "Ya te postulaste a esta solicitud");
         }
         long saldo = billeteras.findById(tecnicoId).map(Billetera::getDisponible).orElse(0L);
         if (saldo < config.saldoMinimo()) { // RF-039
-            throw new ErrorNegocio(HttpStatus.UNPROCESSABLE_ENTITY, "Saldo insuficiente",
-                    "Se necesita un saldo mínimo de " + config.saldoMinimo() + " COP para postularse");
+            throw new ErrorNegocio(Codigo.WALLET_BELOW_MINIMUM, "Se necesita un saldo mínimo de " + config.saldoMinimo() + " COP para postularse");
         }
         if (solicitudes.existsByTecnicoIdAndEstadoIn(tecnicoId, List.of("E03", "E04"))) { // RN-07
-            throw new ErrorNegocio(HttpStatus.CONFLICT, "Tecnico ocupado", "Ya tienes un servicio activo");
+            throw new ErrorNegocio(Codigo.TECHNICIAN_UNAVAILABLE, "Ya tienes un servicio activo");
         }
         Postulacion p = postulaciones.save(new Postulacion(solicitudId, tecnicoId, precio, mensaje, ahora));
         if ("E01".equals(s.getEstado())) {
@@ -103,7 +101,7 @@ public class SolicitudService {
     public List<VistaPostulacion> postulaciones(Long hogarId, Long solicitudId) {
         Solicitud s = solicitudes.findById(solicitudId).orElseThrow(SolicitudService::noEncontrada);
         if (!s.getHogarId().equals(hogarId)) {
-            throw new ErrorNegocio(HttpStatus.FORBIDDEN, "Sin permiso", "La solicitud es de otro hogar");
+            throw new ErrorNegocio(Codigo.FORBIDDEN, "La solicitud es de otro hogar");
         }
         return postulaciones.findBySolicitudId(solicitudId).stream().map(this::vistaPostulacion).toList();
     }
@@ -115,7 +113,7 @@ public class SolicitudService {
         boolean esTecnico = usuarioId.equals(s.getTecnicoId())
                 || (!"HOGAR".equals(rol) && postulaciones.existsBySolicitudIdAndTecnicoId(solicitudId, usuarioId));
         if (!esHogar && !esTecnico) {
-            throw new ErrorNegocio(HttpStatus.FORBIDDEN, "Sin permiso", "No participas en esta solicitud");
+            throw new ErrorNegocio(Codigo.FORBIDDEN, "No participas en esta solicitud");
         }
         return vista(s, usuarioId, rol);
     }
@@ -177,6 +175,6 @@ public class SolicitudService {
     }
 
     static ErrorNegocio noEncontrada() {
-        return new ErrorNegocio(HttpStatus.NOT_FOUND, "No encontrado", "Solicitud inexistente");
+        return new ErrorNegocio(Codigo.NOT_FOUND, "Solicitud inexistente");
     }
 }
