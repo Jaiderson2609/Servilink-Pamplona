@@ -2,6 +2,7 @@ package co.edu.unipamplona.servilink.apoyo;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
 import org.springframework.http.MediaType;
@@ -51,5 +52,43 @@ public abstract class PruebaApi extends PruebaIntegracion {
     protected String recargar(String tokenTecnico, long valor) throws Exception {
         return enviar(tokenTecnico, "/api/v1/billetera/recargas", "{\"valorCop\":" + valor + "}").andReturn()
                 .getResponse().getContentAsString();
+    }
+
+    /** Crea una solicitud, el técnico se postula y el hogar lo asigna: el servicio queda en E03. */
+    protected long asignado(String hogar, String tecnico, String descripcion) throws Exception {
+        long sol = ((Number) campo(enviar(hogar, "/api/v1/solicitudes", solicitudJson(descripcion)), "$.id")).longValue();
+        long pos = ((Number) campo(enviar(tecnico, "/api/v1/solicitudes/" + sol + "/postulaciones",
+                "{\"precioCop\":20000}"), "$.id")).longValue();
+        enviar(hogar, "/api/v1/solicitudes/" + sol + "/asignacion", "{\"postulacionId\":" + pos + "}").andExpect(status().isOk());
+        return sol;
+    }
+
+    /** Del servicio asignado (E03) hasta la confirmación del hogar (E05). */
+    protected void finalizar(String hogar, String tecnico, long sol) throws Exception {
+        enviar(tecnico, "/api/v1/solicitudes/" + sol + "/llegada", null).andExpect(status().isOk());
+        enviar(tecnico, "/api/v1/solicitudes/" + sol + "/trabajo-terminado", null).andExpect(status().isOk());
+        enviar(hogar, "/api/v1/solicitudes/" + sol + "/confirmacion", null).andExpect(status().isOk());
+    }
+
+    protected org.springframework.test.web.servlet.ResultActions subirFoto(String token, long sol, byte[] bytes, String tipo)
+            throws Exception {
+        var archivo = new org.springframework.mock.web.MockMultipartFile("foto", "foto", tipo, bytes);
+        return mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                .multipart("/api/v1/solicitudes/" + sol + "/fotos").file(archivo)
+                .header("Authorization", "Bearer " + token));
+    }
+
+    protected static byte[] jpeg(int tamano) {
+        byte[] b = new byte[tamano];
+        b[0] = (byte) 0xFF; b[1] = (byte) 0xD8; b[2] = (byte) 0xFF; b[3] = (byte) 0xE0;
+        return b;
+    }
+
+    protected static byte[] png() {
+        return new byte[] {(byte) 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 0};
+    }
+
+    protected static byte[] webp() {
+        return new byte[] {'R', 'I', 'F', 'F', 0, 0, 0, 0, 'W', 'E', 'B', 'P', 'V', 'P', '8', ' '};
     }
 }

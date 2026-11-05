@@ -40,6 +40,17 @@ public class ManejadorErrores {
         return problema(HttpStatus.BAD_REQUEST, "Solicitud invalida", "El cuerpo o un parámetro no es válido");
     }
 
+    @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+    ProblemDetail demasiadoGrande(Exception e) {
+        return problema(HttpStatus.PAYLOAD_TOO_LARGE, "Archivo muy grande", "Cada foto puede pesar hasta 2 MB");
+    }
+
+    @ExceptionHandler({org.springframework.web.multipart.support.MissingServletRequestPartException.class,
+            org.springframework.web.bind.MissingServletRequestParameterException.class})
+    ProblemDetail faltaParte(Exception e) {
+        return problema(HttpStatus.BAD_REQUEST, "Solicitud invalida", "Falta el archivo en el campo 'foto'");
+    }
+
     /** Red de seguridad: si una restricción de la base se viola, es un conflicto y no un error 500. */
     @ExceptionHandler(DataIntegrityViolationException.class)
     ProblemDetail integridad(DataIntegrityViolationException e) {
