@@ -32,6 +32,7 @@ publicas = [
 ]
 print("   Públicas (security: [] explícito):", publicas)
 sens = {"cedula", "telefono", "direccion"}
+PERMITIDOS = ("ContactoAsignado", "PerfilResponse", "RegistroRequest", "UsuarioAdmin")
 
 
 def campos(sch, ruta=""):
@@ -49,9 +50,10 @@ for nombre, s in spec["components"]["schemas"].items():
     c = campos(s)
     if c:
         print(f"   Esquema {nombre} contiene datos sensibles:", c)
-    # Datos propios (perfil, registro) o de uso exclusivo del administrador (UsuarioAdmin); nunca en listados públicos.
-    if c and nombre not in ("ContactoAsignado", "PerfilResponse", "RegistroRequest", "UsuarioAdmin"):
+    # Datos propios (perfil, registro) o de uso exclusivo del administrador;
+    # nunca en listados públicos.
+    if c and nombre not in PERMITIDOS:
         fallos.append(f"{nombre} expone {c}")
-print("3) Datos personales solo en ContactoAsignado (visible desde E03), el perfil propio y la vista del administrador")
+print("3) Datos personales solo en ContactoAsignado (E03), el perfil propio y la vista del admin")
 print("FALLOS:", fallos if fallos else "ninguno")
 sys.exit(1 if fallos else 0)
