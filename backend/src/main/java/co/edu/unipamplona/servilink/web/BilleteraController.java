@@ -22,18 +22,18 @@ public class BilleteraController {
         this.oficios = oficios;
     }
 
-    @GetMapping("/billetera")
+    @GetMapping("/wallet")
     public Map<String, Object> consultar(@AuthenticationPrincipal Jwt jwt) {
         return forma(billetera.consultar(Long.valueOf(jwt.getSubject())));
     }
 
     /** Sustituto de Wompi para demostraciones (ver BilleteraService.recargarDemo). */
-    @PostMapping("/billetera/recargas")
+    @PostMapping("/wallet/topups")
     public Map<String, Object> recargar(@Valid @RequestBody Peticiones.Recarga r, @AuthenticationPrincipal Jwt jwt) {
         return forma(billetera.recargarDemo(Long.valueOf(jwt.getSubject()), r.valorCop()));
     }
 
-    @GetMapping("/oficios")
+    @GetMapping("/trades")
     public List<Map<String, Object>> oficios() {
         return oficios.findAll().stream().sorted((a, b) -> a.getId() - b.getId())
                 .map((Oficio o) -> Map.<String, Object>of("id", o.getId(), "nombre", o.getNombre())).toList();

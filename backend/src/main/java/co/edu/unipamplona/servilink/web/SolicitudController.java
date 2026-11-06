@@ -4,24 +4,21 @@ import co.edu.unipamplona.servilink.aplicacion.*;
 import jakarta.validation.Valid;
 import java.net.URI;
 import java.util.List;
-import java.util.Map;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/v1/solicitudes")
+@RequestMapping("/api/v1/service-requests")
 public class SolicitudController {
 
-    private final AsignacionService asignacion;
     private final SolicitudService solicitudes;
     private final EjecucionService ejecucion;
     private final NotificacionService notificaciones;
 
-    public SolicitudController(AsignacionService asignacion, SolicitudService solicitudes, EjecucionService ejecucion,
+    public SolicitudController(SolicitudService solicitudes, EjecucionService ejecucion,
                                NotificacionService notificaciones) {
-        this.asignacion = asignacion;
         this.solicitudes = solicitudes;
         this.ejecucion = ejecucion;
         this.notificaciones = notificaciones;
@@ -42,15 +39,15 @@ public class SolicitudController {
     public ResponseEntity<SolicitudService.Vista> crear(@Valid @RequestBody Peticiones.SolicitudCrear c,
                                                         @AuthenticationPrincipal Jwt jwt) {
         var v = solicitudes.crear(id(jwt), c.oficioId(), c.descripcion(), c.ubicacion().lat(), c.ubicacion().lng());
-        return ResponseEntity.created(URI.create("/api/v1/solicitudes/" + v.id())).body(v);
+        return ResponseEntity.created(URI.create("/api/v1/service-requests/" + v.id())).body(v);
     }
 
-    @GetMapping("/mias")
+    @GetMapping("/mine")
     public List<SolicitudService.Vista> mias(@AuthenticationPrincipal Jwt jwt) {
         return solicitudes.mias(id(jwt), rol(jwt));
     }
 
-    @GetMapping("/abiertas")
+    @GetMapping("/open")
     public List<SolicitudService.Vista> abiertas(@AuthenticationPrincipal Jwt jwt) {
         return solicitudes.abiertas(id(jwt));
     }
@@ -60,51 +57,36 @@ public class SolicitudController {
         return solicitudes.obtener(id(jwt), rol(jwt), solicitudId);
     }
 
-    @PostMapping("/{solicitudId}/postulaciones")
+    @PostMapping("/{solicitudId}/applications")
     public ResponseEntity<SolicitudService.VistaPostulacion> postular(@PathVariable Long solicitudId,
             @Valid @RequestBody Peticiones.PostulacionCrear p, @AuthenticationPrincipal Jwt jwt) {
         var v = solicitudes.postular(id(jwt), solicitudId, p.precioCop(), p.mensaje());
-        return ResponseEntity.created(URI.create("/api/v1/solicitudes/" + solicitudId + "/postulaciones/" + v.id()))
+        return ResponseEntity.created(URI.create("/api/v1/applications/" + v.id()))
                 .body(v);
     }
 
-    @GetMapping("/{solicitudId}/postulaciones")
+    @GetMapping("/{solicitudId}/applications")
     public List<SolicitudService.VistaPostulacion> postulaciones(@PathVariable Long solicitudId,
                                                                  @AuthenticationPrincipal Jwt jwt) {
         return solicitudes.postulaciones(id(jwt), solicitudId);
     }
 
-    @PostMapping("/{solicitudId}/asignacion")
-    public ResponseEntity<Map<String, Object>> asignar(@PathVariable Long solicitudId,
-                                                       @Valid @RequestBody AsignacionCrear cuerpo,
-                                                       @AuthenticationPrincipal Jwt jwt) {
-        var r = asignacion.asignar(id(jwt), solicitudId, cuerpo.postulacionId());
-        if (r.avisoId() != null) {
-            notificaciones.despachar(r.avisoId());
-        }
-        return ResponseEntity.ok(Map.of(
-                "solicitudId", r.solicitudId(),
-                "estado", "E03",
-                "comisionRetenidaCop", r.comisionCop(),
-                "contacto", Map.of("nombre", r.nombreTecnico(), "telefono", r.telefonoTecnico())));
-    }
-
-    @PostMapping("/{solicitudId}/llegada")
+    @PatchMapping("/{solicitudId}/arrive")
     public SolicitudService.Vista llegada(@PathVariable Long solicitudId, @AuthenticationPrincipal Jwt jwt) {
         return despachar(ejecucion.llegada(id(jwt), solicitudId));
     }
 
-    @PostMapping("/{solicitudId}/trabajo-terminado")
+    @PatchMapping("/{solicitudId}/complete")
     public SolicitudService.Vista terminado(@PathVariable Long solicitudId, @AuthenticationPrincipal Jwt jwt) {
         return despachar(ejecucion.trabajoTerminado(id(jwt), solicitudId));
     }
 
-    @PostMapping("/{solicitudId}/confirmacion")
+    @PatchMapping("/{solicitudId}/confirm")
     public SolicitudService.Vista confirmar(@PathVariable Long solicitudId, @AuthenticationPrincipal Jwt jwt) {
         return despachar(ejecucion.confirmar(id(jwt), solicitudId));
     }
 
-    @PostMapping("/{solicitudId}/cancelacion")
+    @PatchMapping("/{solicitudId}/cancel")
     public SolicitudService.Vista cancelar(@PathVariable Long solicitudId,
             @Valid @RequestBody(required = false) Peticiones.Cancelacion c, @AuthenticationPrincipal Jwt jwt) {
         return despachar(ejecucion.cancelar(id(jwt), rol(jwt), solicitudId, c == null ? null : c.motivo()));

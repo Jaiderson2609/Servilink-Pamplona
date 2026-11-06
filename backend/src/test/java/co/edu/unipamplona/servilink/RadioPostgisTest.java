@@ -25,14 +25,14 @@ class RadioPostgisTest extends PruebaApi {
         String hogar = cuenta("HOGAR", correo);
         String json = "{\"oficioId\":2,\"descripcion\":\"Cambiar un tomacorriente roto\",\"ubicacion\":{\"lat\":" + lat
                 + ",\"lng\":" + lng + "}}";
-        return ((Number) campo(enviar(hogar, "/api/v1/solicitudes", json), "$.id")).longValue();
+        return ((Number) campo(enviar(hogar, "/api/v1/service-requests", json), "$.id")).longValue();
     }
 
     @Test
     void sinZonaDeTrabajoSeVeTodoSinDistancia() throws Exception {
         long cerca = solicitudEn("a@correo.co", LAT + 0.009, LNG);
         long lejos = solicitudEn("b@correo.co", 7.8939, -72.5078); // Cúcuta, ~60 km
-        pedir(tecnico, "/api/v1/solicitudes/abiertas").andExpect(jsonPath("$.length()").value(2))
+        pedir(tecnico, "/api/v1/service-requests/open").andExpect(jsonPath("$.length()").value(2))
                 .andExpect(jsonPath("$[0].distanciaM").doesNotExist());
     }
 
@@ -42,7 +42,7 @@ class RadioPostgisTest extends PruebaApi {
         solicitudEn("b@correo.co", LAT + 0.09, LNG);                  // ~10 km
         solicitudEn("c@correo.co", 7.8939, -72.5078);                 // ~60 km
         put(tecnico, "{\"lat\":" + LAT + ",\"lng\":" + LNG + ",\"radioKm\":5}").andExpect(status().isOk());
-        var r = pedir(tecnico, "/api/v1/solicitudes/abiertas").andExpect(status().isOk())
+        var r = pedir(tecnico, "/api/v1/service-requests/open").andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1)).andExpect(jsonPath("$[0].id").value(cerca));
         int d = campo(r, "$[0].distanciaM");
         assertThat(d).isBetween(990, 1010);
@@ -54,7 +54,7 @@ class RadioPostgisTest extends PruebaApi {
         long cerca = solicitudEn("b@correo.co", LAT + 0.009, LNG);    // ~1 km
         long media = solicitudEn("c@correo.co", LAT + 0.036, LNG);    // ~4 km
         put(tecnico, "{\"lat\":" + LAT + ",\"lng\":" + LNG + ",\"radioKm\":15}").andExpect(status().isOk());
-        pedir(tecnico, "/api/v1/solicitudes/abiertas").andExpect(jsonPath("$.length()").value(3))
+        pedir(tecnico, "/api/v1/service-requests/open").andExpect(jsonPath("$.length()").value(3))
                 .andExpect(jsonPath("$[0].id").value(cerca)).andExpect(jsonPath("$[1].id").value(media))
                 .andExpect(jsonPath("$[2].id").value(lejos));
     }
@@ -63,9 +63,9 @@ class RadioPostgisTest extends PruebaApi {
     void elRadioSeCambiaYElResultadoLoSigue() throws Exception {
         solicitudEn("a@correo.co", LAT + 0.09, LNG); // ~10 km
         put(tecnico, "{\"lat\":" + LAT + ",\"lng\":" + LNG + ",\"radioKm\":5}");
-        pedir(tecnico, "/api/v1/solicitudes/abiertas").andExpect(jsonPath("$.length()").value(0));
+        pedir(tecnico, "/api/v1/service-requests/open").andExpect(jsonPath("$.length()").value(0));
         put(tecnico, "{\"lat\":" + LAT + ",\"lng\":" + LNG + ",\"radioKm\":12}");
-        pedir(tecnico, "/api/v1/solicitudes/abiertas").andExpect(jsonPath("$.length()").value(1));
+        pedir(tecnico, "/api/v1/service-requests/open").andExpect(jsonPath("$.length()").value(1));
         assertThat(jdbc.queryForObject("SELECT count(*) FROM ubicaciones_tecnico", Integer.class)).isEqualTo(1);
     }
 
@@ -73,7 +73,7 @@ class RadioPostgisTest extends PruebaApi {
     void sinRadioSeUsanCincoKm() throws Exception {
         put(tecnico, "{\"lat\":" + LAT + ",\"lng\":" + LNG + "}").andExpect(status().isOk())
                 .andExpect(jsonPath("$.radioKm").value(5));
-        pedir(tecnico, "/api/v1/tecnicos/yo/ubicacion").andExpect(status().isOk()).andExpect(jsonPath("$.radioKm").value(5));
+        pedir(tecnico, "/api/v1/technicians/me/location").andExpect(status().isOk()).andExpect(jsonPath("$.radioKm").value(5));
     }
 
     @Test
@@ -82,13 +82,13 @@ class RadioPostgisTest extends PruebaApi {
         solicitudEn("b@correo.co", LAT + 0.018, LNG);
         put(tecnico, "{\"lat\":" + LAT + ",\"lng\":" + LNG + ",\"radioKm\":5}");
         recargar(tecnico, 50_000);
-        long pos = ((Number) campo(enviar(tecnico, "/api/v1/solicitudes/" + asignada + "/postulaciones", "{\"precioCop\":20000}"), "$.id")).longValue();
+        long pos = ((Number) campo(enviar(tecnico, "/api/v1/service-requests/" + asignada + "/applications", "{\"precioCop\":20000}"), "$.id")).longValue();
         String hogarA = campo(enviar(null, "/api/v1/auth/login", "{\"correo\":\"a@correo.co\",\"clave\":\"clave-segura-1\"}"), "$.accessToken");
-        enviar(hogarA, "/api/v1/solicitudes/" + asignada + "/asignacion", "{\"postulacionId\":" + pos + "}").andExpect(status().isOk());
-        pedir(tecnico, "/api/v1/solicitudes/abiertas").andExpect(jsonPath("$.length()").value(1)); // la asignada sale
+        enviar(hogarA, "/api/v1/applications/" + pos + "/select", null).andExpect(status().isOk());
+        pedir(tecnico, "/api/v1/service-requests/open").andExpect(jsonPath("$.length()").value(1)); // la asignada sale
         reloj.fijar(ConfiguracionPruebas.T0.plus(Duration.ofMinutes(11)));
         String t2 = campo(enviar(null, "/api/v1/auth/login", "{\"correo\":\"tec@correo.co\",\"clave\":\"clave-segura-1\"}"), "$.accessToken");
-        pedir(t2, "/api/v1/solicitudes/abiertas").andExpect(jsonPath("$.length()").value(0)); // la otra venció
+        pedir(t2, "/api/v1/service-requests/open").andExpect(jsonPath("$.length()").value(0)); // la otra venció
     }
 
     @Test
@@ -99,7 +99,7 @@ class RadioPostgisTest extends PruebaApi {
         put(tecnico, "{\"lng\":-72.6}").andExpect(status().isBadRequest());
         String hogar = cuenta("HOGAR", "h@correo.co");
         put(hogar, "{\"lat\":7.3,\"lng\":-72.6,\"radioKm\":5}").andExpect(status().isForbidden());
-        pedir(tecnico, "/api/v1/tecnicos/yo/ubicacion").andExpect(status().isNotFound());
+        pedir(tecnico, "/api/v1/technicians/me/location").andExpect(status().isNotFound());
     }
 
     @Test
@@ -110,7 +110,7 @@ class RadioPostgisTest extends PruebaApi {
     }
 
     org.springframework.test.web.servlet.ResultActions put(String token, String json) throws Exception {
-        return mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/v1/tecnicos/yo/ubicacion")
+        return mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/v1/technicians/me/location")
                 .contentType(org.springframework.http.MediaType.APPLICATION_JSON).content(json)
                 .header("Authorization", "Bearer " + token));
     }

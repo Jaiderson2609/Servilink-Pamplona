@@ -33,19 +33,19 @@ public class ParticipantesController {
     private static Long id(Jwt jwt) { return Long.valueOf(jwt.getSubject()); }
     private static String rol(Jwt jwt) { return jwt.getClaimAsString("rol"); }
 
-    @PostMapping(path = "/solicitudes/{solicitudId}/fotos", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PostMapping(path = "/service-requests/{solicitudId}/photos", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<FotoService.Resumen> subirFoto(@PathVariable Long solicitudId,
             @RequestParam("foto") MultipartFile foto, @AuthenticationPrincipal Jwt jwt) throws IOException {
         var r = fotos.subir(id(jwt), solicitudId, foto.getBytes());
-        return ResponseEntity.created(URI.create("/api/v1/solicitudes/" + solicitudId + "/fotos/" + r.id())).body(r);
+        return ResponseEntity.created(URI.create("/api/v1/service-requests/" + solicitudId + "/photos/" + r.id())).body(r);
     }
 
-    @GetMapping("/solicitudes/{solicitudId}/fotos")
+    @GetMapping("/service-requests/{solicitudId}/photos")
     public List<FotoService.Resumen> listarFotos(@PathVariable Long solicitudId, @AuthenticationPrincipal Jwt jwt) {
         return fotos.listar(id(jwt), rol(jwt), solicitudId);
     }
 
-    @GetMapping("/solicitudes/{solicitudId}/fotos/{fotoId}")
+    @GetMapping("/service-requests/{solicitudId}/photos/{fotoId}")
     public ResponseEntity<byte[]> descargarFoto(@PathVariable Long solicitudId, @PathVariable Long fotoId,
             @AuthenticationPrincipal Jwt jwt) {
         var f = fotos.obtener(id(jwt), rol(jwt), solicitudId, fotoId);
@@ -53,27 +53,27 @@ public class ParticipantesController {
                 .cacheControl(CacheControl.noStore()).header("X-Content-Type-Options", "nosniff").body(f.getContenido());
     }
 
-    @PostMapping("/solicitudes/{solicitudId}/mensajes")
+    @PostMapping("/service-requests/{solicitudId}/messages")
     public ResponseEntity<ChatService.Vista> enviarMensaje(@PathVariable Long solicitudId,
             @Valid @RequestBody Peticiones.MensajeCrear m, @AuthenticationPrincipal Jwt jwt) {
         var v = chat.enviar(id(jwt), solicitudId, m.texto());
-        return ResponseEntity.created(URI.create("/api/v1/solicitudes/" + solicitudId + "/mensajes/" + v.id())).body(v);
+        return ResponseEntity.created(URI.create("/api/v1/service-requests/" + solicitudId + "/messages/" + v.id())).body(v);
     }
 
-    @GetMapping("/solicitudes/{solicitudId}/mensajes")
+    @GetMapping("/service-requests/{solicitudId}/messages")
     public List<ChatService.Vista> mensajes(@PathVariable Long solicitudId,
             @RequestParam(defaultValue = "0") long despues, @AuthenticationPrincipal Jwt jwt) {
         return chat.listar(id(jwt), solicitudId, despues);
     }
 
-    @PostMapping("/solicitudes/{solicitudId}/calificacion")
+    @PostMapping("/service-requests/{solicitudId}/ratings")
     public ResponseEntity<CalificacionService.Vista> calificar(@PathVariable Long solicitudId,
             @Valid @RequestBody Peticiones.CalificacionCrear c, @AuthenticationPrincipal Jwt jwt) {
         var v = calificaciones.calificar(id(jwt), solicitudId, c.estrellas(), c.comentario());
-        return ResponseEntity.created(URI.create("/api/v1/solicitudes/" + solicitudId + "/calificacion")).body(v);
+        return ResponseEntity.created(URI.create("/api/v1/service-requests/" + solicitudId + "/ratings")).body(v);
     }
 
-    @GetMapping("/tecnicos/{tecnicoId}/reputacion")
+    @GetMapping("/technicians/{tecnicoId}/reputation")
     public CalificacionService.Reputacion reputacion(@PathVariable Long tecnicoId) {
         return calificaciones.reputacion(tecnicoId);
     }

@@ -4,7 +4,6 @@ import co.edu.unipamplona.servilink.dominio.*;
 import co.edu.unipamplona.servilink.repositorio.*;
 import java.time.Clock;
 import java.time.Instant;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -71,7 +70,7 @@ public class EjecucionService {
             throw estadoInvalido(s);
         }
         if (s.getTerminadoEn() == null) {
-            throw new ErrorNegocio(HttpStatus.CONFLICT, "Trabajo no terminado", "El técnico aún no lo marcó terminado");
+            throw new ErrorNegocio(Codigo.INVALID_STATE_TRANSITION, "El técnico aún no lo marcó terminado");
         }
         Billetera b = billeteras.bloquear(s.getTecnicoId()).orElseThrow();
         long comision = s.getComisionCop();
@@ -91,7 +90,7 @@ public class EjecucionService {
         Long avisoId = null;
         if ("E01".equals(estado) || "E02".equals(estado)) {
             if (!"HOGAR".equals(rol)) {
-                throw new ErrorNegocio(HttpStatus.FORBIDDEN, "Sin permiso", "Solo el hogar cancela antes de asignar");
+                throw new ErrorNegocio(Codigo.FORBIDDEN, "Solo el hogar cancela antes de asignar");
             }
             exigirHogar(s, usuarioId);
         } else if ("E03".equals(estado) || "E04".equals(estado)) {
@@ -101,8 +100,7 @@ public class EjecucionService {
                 exigirTecnico(s, usuarioId);
             }
             if (motivo == null || motivo.isBlank() || motivo.trim().length() < 5) {
-                throw new ErrorNegocio(HttpStatus.BAD_REQUEST, "Solicitud invalida",
-                        "Cancelar un servicio asignado exige un motivo de al menos 5 caracteres");
+                throw new ErrorNegocio(Codigo.VALIDATION_ERROR, "Cancelar un servicio asignado exige un motivo de al menos 5 caracteres");
             }
             Billetera b = billeteras.bloquear(s.getTecnicoId()).orElseThrow();
             long comision = s.getComisionCop();
@@ -131,7 +129,7 @@ public class EjecucionService {
             throw estadoInvalido(s);
         }
         if (motivo == null || motivo.trim().length() < 5) {
-            throw new ErrorNegocio(HttpStatus.BAD_REQUEST, "Solicitud invalida", "El motivo debe tener al menos 5 caracteres");
+            throw new ErrorNegocio(Codigo.VALIDATION_ERROR, "El motivo debe tener al menos 5 caracteres");
         }
         boolean asignada = s.getTecnicoId() != null && java.util.List.of("E03", "E04").contains(s.getEstado());
         if (asignada) {
@@ -156,17 +154,17 @@ public class EjecucionService {
 
     private static void exigirTecnico(Solicitud s, Long tecnicoId) {
         if (!tecnicoId.equals(s.getTecnicoId())) {
-            throw new ErrorNegocio(HttpStatus.FORBIDDEN, "Sin permiso", "No eres el técnico asignado");
+            throw new ErrorNegocio(Codigo.FORBIDDEN, "No eres el técnico asignado");
         }
     }
 
     private static void exigirHogar(Solicitud s, Long hogarId) {
         if (!s.getHogarId().equals(hogarId)) {
-            throw new ErrorNegocio(HttpStatus.FORBIDDEN, "Sin permiso", "La solicitud es de otro hogar");
+            throw new ErrorNegocio(Codigo.FORBIDDEN, "La solicitud es de otro hogar");
         }
     }
 
     private static ErrorNegocio estadoInvalido(Solicitud s) {
-        return new ErrorNegocio(HttpStatus.CONFLICT, "Estado invalido", "La solicitud está en " + s.getEstado());
+        return new ErrorNegocio(Codigo.INVALID_STATE_TRANSITION, "La solicitud está en " + s.getEstado());
     }
 }

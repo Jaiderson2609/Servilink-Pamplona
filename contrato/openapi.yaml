@@ -1,8 +1,11 @@
 openapi: 3.0.3
 info:
   title: API de ServiLink Pamplona
-  description: Contrato de la API REST del monolito modular (diseño Design-First). Un endpoint por contexto delimitado.
-  version: 0.1.0
+  description: >-
+    Contrato de la API REST del monolito modular, alineado con la sección 9 del DDS 2.0: prefijo /api/v1, rutas en
+    inglés y kebab-case, POST para crear y PATCH para cambiar estado, Idempotency-Key en las operaciones marcadas y
+    errores con la forma {code, message, traceId}.
+  version: 1.0.0
 servers:
   - url: http://localhost:8080/api/v1
     description: Desarrollo local
@@ -13,10 +16,31 @@ security:
 tags:
   - name: Identidad
   - name: Solicitudes
-  - name: Matching
+  - name: Postulaciones
+  - name: Ejecución
+  - name: Técnico
   - name: Billetera
-  - name: Notificaciones
+  - name: Chat y calificación
+  - name: Administración
 paths:
+  /auth/register:
+    post:
+      tags: [Identidad]
+      summary: Crear una cuenta de hogar o técnico con consentimiento
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegistroRequest' }
+      responses:
+        '201':
+          description: Cuenta creada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RegistroResponse' }
+        '400': { $ref: '#/components/responses/Invalida' }
+        '409': { $ref: '#/components/responses/Conflicto' }
   /auth/login:
     post:
       tags: [Identidad]
@@ -33,12 +57,39 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/TokenResponse' }
-        '400': { $ref: '#/components/responses/SolicitudInvalida' }
+        '400': { $ref: '#/components/responses/Invalida' }
         '401': { $ref: '#/components/responses/NoAutenticado' }
-  /solicitudes:
+        '403': { $ref: '#/components/responses/SinPermiso' }
+  /me:
+    get:
+      tags: [Identidad]
+      summary: Perfil del usuario autenticado
+      responses:
+        '200':
+          description: Perfil propio
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PerfilResponse' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+  /trades:
+    get:
+      tags: [Solicitudes]
+      summary: Listar los oficios disponibles
+      responses:
+        '200':
+          description: Catálogo de oficios
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Oficio' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+  /service-requests:
     post:
       tags: [Solicitudes]
       summary: Publicar una solicitud de servicio (rol HOGAR)
+      parameters:
+        - { $ref: '#/components/parameters/IdempotencyKey' }
       requestBody:
         required: true
         content:
@@ -54,10 +105,38 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/SolicitudResponse' }
-        '400': { $ref: '#/components/responses/SolicitudInvalida' }
+        '400': { $ref: '#/components/responses/Invalida' }
         '401': { $ref: '#/components/responses/NoAutenticado' }
         '403': { $ref: '#/components/responses/SinPermiso' }
-  /solicitudes/{solicitudId}:
+        '409': { $ref: '#/components/responses/Conflicto' }
+  /service-requests/mine:
+    get:
+      tags: [Solicitudes]
+      summary: Solicitudes propias (hogar) o servicios en los que participa (técnico)
+      responses:
+        '200':
+          description: Lista de solicitudes
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/SolicitudResponse' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+  /service-requests/open:
+    get:
+      tags: [Solicitudes]
+      summary: Solicitudes abiertas dentro de la zona de trabajo del técnico, de la más cercana a la más lejana
+      responses:
+        '200':
+          description: Solicitudes abiertas con distanciaM cuando el técnico definió su zona
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/SolicitudResponse' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+  /service-requests/{solicitudId}:
     get:
       tags: [Solicitudes]
       summary: Consultar una solicitud propia o a la que se postuló
@@ -72,83 +151,441 @@ paths:
         '401': { $ref: '#/components/responses/NoAutenticado' }
         '403': { $ref: '#/components/responses/SinPermiso' }
         '404': { $ref: '#/components/responses/NoEncontrado' }
-  /solicitudes/{solicitudId}/asignacion:
+  /service-requests/{solicitudId}/applications:
+    post:
+      tags: [Postulaciones]
+      summary: Postularse con un precio (rol TECNICO)
+      parameters:
+        - { $ref: '#/components/parameters/SolicitudId' }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PostulacionCrear' }
+      responses:
+        '201':
+          description: Postulación registrada; la primera lleva la solicitud a E02
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PostulacionResponse' }
+        '400': { $ref: '#/components/responses/Invalida' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '409': { $ref: '#/components/responses/Conflicto' }
+        '410': { $ref: '#/components/responses/Expirada' }
+        '422': { $ref: '#/components/responses/NoProcesable' }
+    get:
+      tags: [Postulaciones]
+      summary: Ofertas recibidas por la solicitud (rol HOGAR dueño)
+      parameters:
+        - { $ref: '#/components/parameters/SolicitudId' }
+      responses:
+        '200':
+          description: Postulaciones con la reputación de cada técnico
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/PostulacionResponse' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+  /applications/{postulacionId}/select:
+    patch:
+      tags: [Postulaciones]
+      summary: Elegir al técnico y retener su comisión (E02 a E03)
+      parameters:
+        - { $ref: '#/components/parameters/PostulacionId' }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      responses:
+        '200':
+          description: Técnico asignado; el contacto se muestra solo a partir de E03
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AsignacionResponse' }
+        '400': { $ref: '#/components/responses/Invalida' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '409': { $ref: '#/components/responses/Conflicto' }
+        '410': { $ref: '#/components/responses/Expirada' }
+        '422': { $ref: '#/components/responses/NoProcesable' }
+  /service-requests/{solicitudId}/arrive:
+    patch:
+      tags: [Ejecución]
+      summary: El técnico asignado marca su llegada (E03 a E04)
+      parameters:
+        - { $ref: '#/components/parameters/SolicitudId' }
+      responses:
+        '200': { $ref: '#/components/responses/SolicitudActualizada' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '409': { $ref: '#/components/responses/Conflicto' }
+  /service-requests/{solicitudId}/complete:
+    patch:
+      tags: [Ejecución]
+      summary: El técnico marca el trabajo como terminado
+      parameters:
+        - { $ref: '#/components/parameters/SolicitudId' }
+      responses:
+        '200': { $ref: '#/components/responses/SolicitudActualizada' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '409': { $ref: '#/components/responses/Conflicto' }
+  /service-requests/{solicitudId}/confirm:
+    patch:
+      tags: [Ejecución]
+      summary: El hogar confirma; la retención pasa a comisión (E04 a E05)
+      parameters:
+        - { $ref: '#/components/parameters/SolicitudId' }
+      responses:
+        '200': { $ref: '#/components/responses/SolicitudActualizada' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '409': { $ref: '#/components/responses/Conflicto' }
+  /service-requests/{solicitudId}/cancel:
+    patch:
+      tags: [Ejecución]
+      summary: Cancelar (E07); el motivo es obligatorio desde E03 y libera la retención
+      parameters:
+        - { $ref: '#/components/parameters/SolicitudId' }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Cancelacion' }
+      responses:
+        '200': { $ref: '#/components/responses/SolicitudActualizada' }
+        '400': { $ref: '#/components/responses/Invalida' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '409': { $ref: '#/components/responses/Conflicto' }
+  /service-requests/{solicitudId}/photos:
     post:
       tags: [Solicitudes]
-      summary: Aceptar una postulación y asignar al técnico (E02 a E03)
+      summary: Agregar una foto (máximo 3, hasta 2 MB; JPEG, PNG o WebP verificado por contenido)
+      parameters:
+        - { $ref: '#/components/parameters/SolicitudId' }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [foto]
+              properties:
+                foto: { type: string, format: binary }
+      responses:
+        '201':
+          description: Foto guardada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FotoResumen' }
+        '400': { $ref: '#/components/responses/Invalida' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '409': { $ref: '#/components/responses/Conflicto' }
+        '413': { $ref: '#/components/responses/Invalida' }
+        '415': { $ref: '#/components/responses/Invalida' }
+    get:
+      tags: [Solicitudes]
+      summary: Listar las fotos de la solicitud (participantes y técnicos que la ven abierta)
+      parameters:
+        - { $ref: '#/components/parameters/SolicitudId' }
+      responses:
+        '200':
+          description: Fotos
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/FotoResumen' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+  /service-requests/{solicitudId}/photos/{fotoId}:
+    get:
+      tags: [Solicitudes]
+      summary: Descargar una foto
+      parameters:
+        - { $ref: '#/components/parameters/SolicitudId' }
+        - { name: fotoId, in: path, required: true, schema: { type: integer, format: int64 } }
+      responses:
+        '200':
+          description: Contenido de la imagen
+          content:
+            image/jpeg: { schema: { type: string, format: binary } }
+            image/png: { schema: { type: string, format: binary } }
+            image/webp: { schema: { type: string, format: binary } }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+  /service-requests/{solicitudId}/messages:
+    post:
+      tags: [Chat y calificación]
+      summary: Enviar un mensaje (solo en E03 y E04)
       parameters:
         - { $ref: '#/components/parameters/SolicitudId' }
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/AsignacionCrear' }
+            schema: { $ref: '#/components/schemas/MensajeCrear' }
       responses:
-        '200':
-          description: Técnico asignado; se muestra el contacto solo a partir de E03
+        '201':
+          description: Mensaje enviado
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/AsignacionResponse' }
+              schema: { $ref: '#/components/schemas/MensajeResponse' }
+        '400': { $ref: '#/components/responses/Invalida' }
         '401': { $ref: '#/components/responses/NoAutenticado' }
         '403': { $ref: '#/components/responses/SinPermiso' }
-        '404': { $ref: '#/components/responses/NoEncontrado' }
-        '409':
-          description: La solicitud no está en E02 o la ventana ya expiró
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problema' }
-        '422':
-          description: Saldo insuficiente del técnico para retener la comisión
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problema' }
-  /tecnicos/cercanos:
+        '422': { $ref: '#/components/responses/NoProcesable' }
     get:
-      tags: [Matching]
-      summary: Listar técnicos elegibles dentro del radio (rol HOGAR)
+      tags: [Chat y calificación]
+      summary: Leer los mensajes; con despues se traen solo los nuevos
       parameters:
-        - { name: oficioId, in: query, required: true, schema: { type: integer, minimum: 1 } }
-        - { name: lat, in: query, required: true, schema: { type: number, minimum: -90, maximum: 90 } }
-        - { name: lng, in: query, required: true, schema: { type: number, minimum: -180, maximum: 180 } }
-        - { name: radioKm, in: query, required: false, schema: { type: number, default: 5, minimum: 1, maximum: 20 } }
+        - { $ref: '#/components/parameters/SolicitudId' }
+        - { name: despues, in: query, required: false, schema: { type: integer, format: int64, default: 0 } }
       responses:
         '200':
-          description: Técnicos elegibles, con datos públicos únicamente
+          description: Mensajes en orden
           content:
             application/json:
               schema:
                 type: array
-                items: { $ref: '#/components/schemas/TecnicoPublicResponse' }
-        '400': { $ref: '#/components/responses/SolicitudInvalida' }
+                items: { $ref: '#/components/schemas/MensajeResponse' }
         '401': { $ref: '#/components/responses/NoAutenticado' }
         '403': { $ref: '#/components/responses/SinPermiso' }
-  /billetera:
+        '422': { $ref: '#/components/responses/NoProcesable' }
+  /service-requests/{solicitudId}/ratings:
+    post:
+      tags: [Chat y calificación]
+      summary: Calificar a la contraparte (solo en E05, una vez por participante)
+      parameters:
+        - { $ref: '#/components/parameters/SolicitudId' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CalificacionCrear' }
+      responses:
+        '201':
+          description: Calificación registrada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CalificacionResponse' }
+        '400': { $ref: '#/components/responses/Invalida' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '409': { $ref: '#/components/responses/Conflicto' }
+  /technicians/{tecnicoId}/reputation:
     get:
-      tags: [Billetera]
-      summary: Consultar el saldo y los últimos movimientos (rol TECNICO)
+      tags: [Chat y calificación]
+      summary: Promedio y cantidad de calificaciones de un técnico
+      parameters:
+        - { name: tecnicoId, in: path, required: true, schema: { type: integer, format: int64 } }
       responses:
         '200':
-          description: Estado de la billetera del técnico autenticado
+          description: Reputación
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Reputacion' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+  /technicians/me/location:
+    put:
+      tags: [Técnico]
+      summary: Definir la zona de trabajo (punto base y radio en km)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ZonaTrabajo' }
+      responses:
+        '200':
+          description: Zona guardada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ZonaTrabajoResponse' }
+        '400': { $ref: '#/components/responses/Invalida' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+    get:
+      tags: [Técnico]
+      summary: Consultar la zona de trabajo
+      responses:
+        '200':
+          description: Zona vigente
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ZonaTrabajoResponse' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+  /wallet:
+    get:
+      tags: [Billetera]
+      summary: Saldo disponible, retenido y últimos movimientos (rol TECNICO)
+      responses:
+        '200':
+          description: Estado de la billetera
           content:
             application/json:
               schema: { $ref: '#/components/schemas/BilleteraResponse' }
         '401': { $ref: '#/components/responses/NoAutenticado' }
         '403': { $ref: '#/components/responses/SinPermiso' }
-  /dispositivos/{dispositivoId}:
-    put:
-      tags: [Notificaciones]
-      summary: Registrar o actualizar el token FCM de un dispositivo
+  /wallet/topups:
+    post:
+      tags: [Billetera]
+      summary: Recargar el saldo (recarga de demostración mientras no se active Wompi)
       parameters:
-        - { name: dispositivoId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/DispositivoRegistro' }
+            schema: { $ref: '#/components/schemas/RecargaCrear' }
       responses:
-        '204': { description: Token registrado o actualizado }
-        '400': { $ref: '#/components/responses/SolicitudInvalida' }
+        '200':
+          description: Recarga acreditada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BilleteraResponse' }
+        '400': { $ref: '#/components/responses/Invalida' }
         '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+  /admin/summary:
+    get:
+      tags: [Administración]
+      summary: Conteos por estado, usuarios por rol y comisiones
+      responses:
+        '200':
+          description: Resumen de la plataforma
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ResumenAdmin' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+  /admin/users:
+    get:
+      tags: [Administración]
+      summary: Listar usuarios con filtro por rol y búsqueda por nombre o correo
+      parameters:
+        - { name: rol, in: query, required: false, schema: { type: string, enum: [HOGAR, TECNICO, ADMIN] } }
+        - { name: q, in: query, required: false, schema: { type: string } }
+        - { $ref: '#/components/parameters/Pagina' }
+        - { $ref: '#/components/parameters/Tamano' }
+      responses:
+        '200':
+          description: Página de usuarios
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PaginaUsuarios' }
+        '400': { $ref: '#/components/responses/Invalida' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+  /admin/users/{usuarioId}/status:
+    patch:
+      tags: [Administración]
+      summary: Suspender o reactivar una cuenta; deja huella en la auditoría
+      parameters:
+        - { name: usuarioId, in: path, required: true, schema: { type: integer, format: int64 } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EstadoCuenta' }
+      responses:
+        '200':
+          description: Cuenta actualizada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UsuarioAdmin' }
+        '400': { $ref: '#/components/responses/Invalida' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '409': { $ref: '#/components/responses/Conflicto' }
+  /admin/service-requests:
+    get:
+      tags: [Administración]
+      summary: Listar solicitudes, con filtro por estado
+      parameters:
+        - { name: estado, in: query, required: false, schema: { type: string, enum: [E01, E02, E03, E04, E05, E06, E07] } }
+        - { $ref: '#/components/parameters/Pagina' }
+        - { $ref: '#/components/parameters/Tamano' }
+      responses:
+        '200':
+          description: Página de solicitudes
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PaginaSolicitudes' }
+        '400': { $ref: '#/components/responses/Invalida' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+  /admin/service-requests/{solicitudId}/cancel:
+    patch:
+      tags: [Administración]
+      summary: Cancelar una solicitud por disputa; libera la comisión y avisa a las partes
+      parameters:
+        - { $ref: '#/components/parameters/SolicitudId' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MotivoAdmin' }
+      responses:
+        '200':
+          description: Solicitud cancelada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SolicitudAdmin' }
+        '400': { $ref: '#/components/responses/Invalida' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '409': { $ref: '#/components/responses/Conflicto' }
+  /admin/ledger:
+    get:
+      tags: [Administración]
+      summary: Libro de movimientos de una solicitud
+      parameters:
+        - { name: solicitudId, in: query, required: true, schema: { type: integer, format: int64 } }
+      responses:
+        '200':
+          description: Asientos de la solicitud
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/MovimientoAdmin' }
+        '400': { $ref: '#/components/responses/Invalida' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+  /admin/audit-events:
+    get:
+      tags: [Administración]
+      summary: Auditoría de las acciones administrativas, la más reciente primero
+      parameters:
+        - { $ref: '#/components/parameters/Pagina' }
+        - { $ref: '#/components/parameters/Tamano' }
+      responses:
+        '200':
+          description: Página de eventos
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PaginaAuditoria' }
+        '400': { $ref: '#/components/responses/Invalida' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
 components:
   securitySchemes:
     bearerAuth:
@@ -161,56 +598,137 @@ components:
       in: path
       required: true
       schema: { type: integer, format: int64, minimum: 1 }
+    PostulacionId:
+      name: postulacionId
+      in: path
+      required: true
+      schema: { type: integer, format: int64, minimum: 1 }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      description: >-
+        Clave única por intento (8 a 80 caracteres: letras, números, guion y guion bajo). Un reintento con la misma clave
+        devuelve la respuesta guardada, con la cabecera Idempotent-Replay, y no repite la operación. Vigencia de 24 horas.
+      schema: { type: string, minLength: 8, maxLength: 80, pattern: '^[A-Za-z0-9_-]+$' }
+    Pagina:
+      name: pagina
+      in: query
+      required: false
+      schema: { type: integer, minimum: 0, default: 0 }
+    Tamano:
+      name: tamano
+      in: query
+      required: false
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
   responses:
-    SolicitudInvalida:
-      description: Datos de entrada inválidos
+    SolicitudActualizada:
+      description: Solicitud con su nuevo estado
       content:
-        application/problem+json:
-          schema: { $ref: '#/components/schemas/Problema' }
+        application/json:
+          schema: { $ref: '#/components/schemas/SolicitudResponse' }
+    Invalida:
+      description: Datos de entrada inválidos (VALIDATION_ERROR, PAYLOAD_TOO_LARGE, UNSUPPORTED_MEDIA_TYPE)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorApi' }
     NoAutenticado:
-      description: Token ausente, vencido o con firma inválida
+      description: Token ausente, vencido o con firma inválida (UNAUTHENTICATED)
       content:
-        application/problem+json:
-          schema: { $ref: '#/components/schemas/Problema' }
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorApi' }
     SinPermiso:
-      description: Token válido, pero sin permiso sobre el recurso
+      description: Token válido, pero sin rol o propiedad sobre el recurso (FORBIDDEN, ACCOUNT_SUSPENDED)
       content:
-        application/problem+json:
-          schema: { $ref: '#/components/schemas/Problema' }
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorApi' }
     NoEncontrado:
-      description: El recurso no existe
+      description: El recurso no existe (NOT_FOUND)
       content:
-        application/problem+json:
-          schema: { $ref: '#/components/schemas/Problema' }
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorApi' }
+    Conflicto:
+      description: >-
+        Choca con el estado actual (ACTIVE_REQUEST_EXISTS, DUPLICATE_APPLICATION, INVALID_STATE_TRANSITION,
+        TECHNICIAN_UNAVAILABLE, EMAIL_ALREADY_REGISTERED, PHOTO_LIMIT_REACHED, DUPLICATE_RATING, CONFLICT)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorApi' }
+    Expirada:
+      description: La ventana de tiempo ya cerró (SERVICE_EXPIRED)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorApi' }
+    NoProcesable:
+      description: Regla de negocio no cumplida (WALLET_BELOW_MINIMUM, INSUFFICIENT_BALANCE, CHAT_CLOSED)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorApi' }
   schemas:
-    Problema:
+    ErrorApi:
       type: object
-      required: [type, title, status]
+      required: [code, message, traceId]
       properties:
-        type: { type: string, example: 'https://servilink.co/errores/ventana-expirada' }
-        title: { type: string, example: La ventana de postulación expiró }
-        status: { type: integer, example: 409 }
-        detail: { type: string }
+        code:
+          type: string
+          example: SERVICE_EXPIRED
+          description: Código estable del catálogo de errores del DDS 11.1
+        message: { type: string, example: La ventana de selección terminó }
+        traceId: { type: string, format: uuid }
+    RegistroRequest:
+      type: object
+      required: [nombre, correo, telefono, clave, rol, aceptaTerminos]
+      properties:
+        nombre: { type: string, maxLength: 80 }
+        correo: { type: string, format: email }
+        telefono: { type: string, example: '3001234567' }
+        clave: { type: string, format: password, minLength: 8, maxLength: 72 }
+        rol: { type: string, enum: [HOGAR, TECNICO] }
+        aceptaTerminos: { type: boolean, description: Debe ser true }
+    RegistroResponse:
+      type: object
+      required: [id, rol]
+      properties:
+        id: { type: integer, format: int64 }
+        rol: { type: string }
     LoginRequest:
       type: object
       required: [correo, clave]
       properties:
         correo: { type: string, format: email }
-        clave: { type: string, format: password, minLength: 8 }
+        clave: { type: string, format: password }
     TokenResponse:
       type: object
-      required: [accessToken, tokenType, expiresIn]
+      required: [accessToken, tokenType, expiresIn, usuarioId, rol, nombre]
       properties:
         accessToken: { type: string }
         tokenType: { type: string, enum: [Bearer] }
         expiresIn: { type: integer, example: 900, description: Segundos de vigencia }
-        refreshToken: { type: string }
+        usuarioId: { type: integer, format: int64 }
+        rol: { type: string, enum: [HOGAR, TECNICO, ADMIN] }
+        nombre: { type: string }
+    PerfilResponse:
+      type: object
+      description: Datos propios del usuario autenticado
+      required: [id, rol, nombre, correo]
+      properties:
+        id: { type: integer, format: int64 }
+        rol: { type: string }
+        nombre: { type: string }
+        correo: { type: string }
+        telefono: { type: string }
+    Oficio:
+      type: object
+      required: [id, nombre]
+      properties:
+        id: { type: integer }
+        nombre: { type: string, example: Electricista }
     Ubicacion:
       type: object
       required: [lat, lng]
       properties:
-        lat: { type: number, minimum: -90, maximum: 90, example: 7.8939 }
-        lng: { type: number, minimum: -180, maximum: 180, example: -72.5078 }
+        lat: { type: number, minimum: -90, maximum: 90, example: 7.3772 }
+        lng: { type: number, minimum: -180, maximum: 180, example: -72.6473 }
     SolicitudCrear:
       type: object
       required: [oficioId, descripcion, ubicacion]
@@ -218,67 +736,238 @@ components:
         oficioId: { type: integer, minimum: 1 }
         descripcion: { type: string, minLength: 10, maxLength: 500 }
         ubicacion: { $ref: '#/components/schemas/Ubicacion' }
-        precioSugeridoCop: { type: integer, minimum: 0, example: 60000 }
-        fotos:
-          type: array
-          maxItems: 5
-          items: { type: string, format: uri }
-    SolicitudResponse:
-      type: object
-      required: [id, estado, oficioId, descripcion, expiraEn]
-      properties:
-        id: { type: integer, format: int64 }
-        estado: { type: string, enum: [E01, E02, E03, E04, E05, E06, E07] }
-        oficioId: { type: integer }
-        descripcion: { type: string }
-        precioAcordadoCop: { type: integer, nullable: true }
-        expiraEn: { type: string, format: date-time }
-    AsignacionCrear:
-      type: object
-      required: [postulacionId]
-      properties:
-        postulacionId: { type: integer, format: int64 }
     ContactoAsignado:
       type: object
       description: Visible solo para las dos partes y solo desde E03
       required: [nombre, telefono]
       properties:
         nombre: { type: string }
-        telefono: { type: string, example: '+57 300 000 0000' }
+        telefono: { type: string, example: '3001234567' }
+    SolicitudResponse:
+      type: object
+      required: [id, estado, descripcion, expiraEn]
+      properties:
+        id: { type: integer, format: int64 }
+        estado: { type: string, enum: [E01, E02, E03, E04, E05, E06, E07] }
+        oficioId: { type: integer }
+        oficio: { type: string }
+        descripcion: { type: string }
+        precioAcordadoCop: { type: integer, nullable: true }
+        comisionCop: { type: integer, nullable: true }
+        expiraEn: { type: string, format: date-time }
+        terminadoEn: { type: string, format: date-time, nullable: true }
+        hogarId: { type: integer, format: int64 }
+        tecnicoId: { type: integer, format: int64, nullable: true }
+        motivoCancelacion: { type: string, nullable: true }
+        contacto: { allOf: [{ $ref: '#/components/schemas/ContactoAsignado' }], nullable: true }
+        distanciaM: { type: integer, nullable: true, description: 'Distancia a la zona de trabajo del técnico, en metros' }
+    PostulacionCrear:
+      type: object
+      required: [precioCop]
+      properties:
+        precioCop: { type: integer, minimum: 1000, maximum: 5000000 }
+        mensaje: { type: string, maxLength: 200, nullable: true }
+    PostulacionResponse:
+      type: object
+      required: [id, tecnicoId, precioCop, estado]
+      properties:
+        id: { type: integer, format: int64 }
+        tecnicoId: { type: integer, format: int64 }
+        tecnico: { type: string }
+        precioCop: { type: integer }
+        mensaje: { type: string, nullable: true }
+        estado: { type: string, enum: [ACTIVA, ELEGIDA, DESCARTADA] }
+        calificacionPromedio: { type: number, nullable: true }
+        calificaciones: { type: integer }
     AsignacionResponse:
       type: object
       required: [solicitudId, estado, comisionRetenidaCop, contacto]
       properties:
         solicitudId: { type: integer, format: int64 }
         estado: { type: string, enum: [E03] }
-        comisionRetenidaCop: { type: integer, example: 6000 }
+        comisionRetenidaCop: { type: integer, example: 2000 }
         contacto: { $ref: '#/components/schemas/ContactoAsignado' }
-    TecnicoPublicResponse:
+    Cancelacion:
       type: object
-      required: [id, nombrePila, oficio, distanciaKm]
+      properties:
+        motivo: { type: string, maxLength: 200, description: Obligatorio (mínimo 5 caracteres) desde E03 }
+    FotoResumen:
+      type: object
+      required: [id, tipoMime, tamanoBytes, creadaEn]
       properties:
         id: { type: integer, format: int64 }
-        nombrePila: { type: string, example: Carlos }
-        oficio: { type: string, example: Electricista }
-        distanciaKm: { type: number, example: 1.8 }
+        tipoMime: { type: string, enum: [image/jpeg, image/png, image/webp] }
+        tamanoBytes: { type: integer }
+        creadaEn: { type: string, format: date-time }
+    MensajeCrear:
+      type: object
+      required: [texto]
+      properties:
+        texto: { type: string, minLength: 1, maxLength: 500 }
+    MensajeResponse:
+      type: object
+      required: [id, autorId, texto, creadoEn, mio]
+      properties:
+        id: { type: integer, format: int64 }
+        autorId: { type: integer, format: int64 }
+        texto: { type: string }
+        creadoEn: { type: string, format: date-time }
+        mio: { type: boolean }
+    CalificacionCrear:
+      type: object
+      required: [estrellas]
+      properties:
+        estrellas: { type: integer, minimum: 1, maximum: 5 }
+        comentario: { type: string, maxLength: 300, nullable: true }
+    CalificacionResponse:
+      type: object
+      required: [id, solicitudId, destinatarioId, estrellas, creadaEn]
+      properties:
+        id: { type: integer, format: int64 }
+        solicitudId: { type: integer, format: int64 }
+        destinatarioId: { type: integer, format: int64 }
+        estrellas: { type: integer }
+        comentario: { type: string, nullable: true }
+        creadaEn: { type: string, format: date-time }
+    Reputacion:
+      type: object
+      required: [tecnicoId, calificaciones]
+      properties:
+        tecnicoId: { type: integer, format: int64 }
+        promedio: { type: number, nullable: true }
+        calificaciones: { type: integer }
+    ZonaTrabajo:
+      type: object
+      required: [lat, lng]
+      properties:
+        lat: { type: number, minimum: -90, maximum: 90 }
+        lng: { type: number, minimum: -180, maximum: 180 }
+        radioKm: { type: integer, minimum: 1, maximum: 50, default: 5 }
+    ZonaTrabajoResponse:
+      type: object
+      required: [lat, lng, radioKm]
+      properties:
+        lat: { type: number }
+        lng: { type: number }
+        radioKm: { type: integer }
+        actualizadaEn: { type: string, format: date-time }
+    RecargaCrear:
+      type: object
+      required: [valorCop]
+      properties:
+        valorCop: { type: integer, minimum: 1000, maximum: 1000000 }
     BilleteraResponse:
       type: object
       required: [saldoDisponibleCop, saldoRetenidoCop, movimientos]
       properties:
         saldoDisponibleCop: { type: integer, example: 24000 }
-        saldoRetenidoCop: { type: integer, example: 6000 }
+        saldoRetenidoCop: { type: integer, example: 2000 }
         movimientos:
           type: array
           items:
             type: object
-            required: [id, tipo, valorCop, fecha]
+            required: [id, tipo, valorCop, fecha, saldoPosteriorCop]
             properties:
               id: { type: integer, format: int64 }
               tipo: { type: string, enum: [RECARGA, RETENCION, COMISION, LIBERACION] }
               valorCop: { type: integer }
               fecha: { type: string, format: date-time }
-    DispositivoRegistro:
+              saldoPosteriorCop: { type: integer }
+    ResumenAdmin:
       type: object
-      required: [fcmToken]
+      required: [solicitudesPorEstado, usuariosPorRol, cuentasSuspendidas, comisionesCobradasCop, comisionesRetenidasCop]
       properties:
-        fcmToken: { type: string, minLength: 20 }
+        solicitudesPorEstado:
+          type: object
+          additionalProperties: { type: integer }
+        usuariosPorRol:
+          type: object
+          additionalProperties: { type: integer }
+        cuentasSuspendidas: { type: integer }
+        comisionesCobradasCop: { type: integer }
+        comisionesRetenidasCop: { type: integer }
+    EstadoCuenta:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, enum: [ACTIVE, SUSPENDED] }
+        reason: { type: string, minLength: 5, maxLength: 200, description: Obligatorio al suspender }
+    MotivoAdmin:
+      type: object
+      required: [motivo]
+      properties:
+        motivo: { type: string, minLength: 5, maxLength: 200 }
+    UsuarioAdmin:
+      type: object
+      description: Vista exclusiva del rol ADMIN
+      required: [id, rol, nombre, correo, suspendido]
+      properties:
+        id: { type: integer, format: int64 }
+        rol: { type: string }
+        nombre: { type: string }
+        correo: { type: string }
+        telefono: { type: string }
+        suspendido: { type: boolean }
+        motivoSuspension: { type: string, nullable: true }
+    SolicitudAdmin:
+      type: object
+      required: [id, estado, descripcion, hogarId]
+      properties:
+        id: { type: integer, format: int64 }
+        estado: { type: string }
+        oficioId: { type: integer }
+        descripcion: { type: string }
+        hogarId: { type: integer, format: int64 }
+        tecnicoId: { type: integer, format: int64, nullable: true }
+        precioAcordadoCop: { type: integer, nullable: true }
+        comisionCop: { type: integer, nullable: true }
+        expiraEn: { type: string, format: date-time }
+        canceladaPor: { type: string, nullable: true }
+        motivoCancelacion: { type: string, nullable: true }
+    MovimientoAdmin:
+      type: object
+      required: [id, tecnicoId, tipo, valorCop]
+      properties:
+        id: { type: integer, format: int64 }
+        tecnicoId: { type: integer, format: int64 }
+        solicitudId: { type: integer, format: int64, nullable: true }
+        tipo: { type: string }
+        valorCop: { type: integer }
+        saldoPosteriorCop: { type: integer }
+        referencia: { type: string, nullable: true }
+        creadoEn: { type: string, format: date-time }
+    Auditoria:
+      type: object
+      required: [id, adminId, accion, objetivoTipo, objetivoId, creadaEn]
+      properties:
+        id: { type: integer, format: int64 }
+        adminId: { type: integer, format: int64 }
+        accion: { type: string, enum: [SUSPENDER_USUARIO, REACTIVAR_USUARIO, CANCELAR_SOLICITUD] }
+        objetivoTipo: { type: string }
+        objetivoId: { type: integer, format: int64 }
+        detalle: { type: string, nullable: true }
+        creadaEn: { type: string, format: date-time }
+    PaginaUsuarios:
+      type: object
+      required: [items, pagina, tamano, total]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/UsuarioAdmin' } }
+        pagina: { type: integer }
+        tamano: { type: integer }
+        total: { type: integer, format: int64 }
+    PaginaSolicitudes:
+      type: object
+      required: [items, pagina, tamano, total]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/SolicitudAdmin' } }
+        pagina: { type: integer }
+        tamano: { type: integer }
+        total: { type: integer, format: int64 }
+    PaginaAuditoria:
+      type: object
+      required: [items, pagina, tamano, total]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/Auditoria' } }
+        pagina: { type: integer }
+        tamano: { type: integer }
+        total: { type: integer, format: int64 }

@@ -1,6 +1,7 @@
 package co.edu.unipamplona.servilink.apoyo;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -21,9 +22,22 @@ public abstract class PruebaApi extends PruebaIntegracion {
     }
 
     protected ResultActions enviar(String token, String url, String json) throws Exception {
-        MockHttpServletRequestBuilder req = post(url).contentType(MediaType.APPLICATION_JSON).content(json == null ? "" : json);
+        return enviar(token, url, json, null);
+    }
+
+    /** Las transiciones de estado usan PATCH (DDS 9); crear recursos usa POST. */
+    protected static boolean esTransicion(String url) {
+        return url.matches(".*/(arrive|complete|confirm|cancel|select|status)$");
+    }
+
+    protected ResultActions enviar(String token, String url, String json, String claveIdempotencia) throws Exception {
+        MockHttpServletRequestBuilder req = (esTransicion(url) ? patch(url) : post(url))
+                .contentType(MediaType.APPLICATION_JSON).content(json == null ? "" : json);
         if (token != null) {
             req.header("Authorization", "Bearer " + token);
+        }
+        if (claveIdempotencia != null) {
+            req.header("Idempotency-Key", claveIdempotencia);
         }
         return mvc.perform(req);
     }
@@ -42,7 +56,7 @@ public abstract class PruebaApi extends PruebaIntegracion {
 
     /** Registra por la API, inicia sesión y devuelve el token. */
     protected String cuenta(String rol, String correo) throws Exception {
-        enviar(null, "/api/v1/auth/registro", "{\"nombre\":\"Usuario " + correo + "\",\"correo\":\"" + correo
+        enviar(null, "/api/v1/auth/register", "{\"nombre\":\"Usuario " + correo + "\",\"correo\":\"" + correo
                 + "\",\"telefono\":\"3001234567\",\"clave\":\"clave-segura-1\",\"rol\":\"" + rol
                 + "\",\"aceptaTerminos\":true}").andReturn();
         return campo(enviar(null, "/api/v1/auth/login", "{\"correo\":\"" + correo + "\",\"clave\":\"clave-segura-1\"}"),
@@ -58,31 +72,31 @@ public abstract class PruebaApi extends PruebaIntegracion {
     }
 
     protected String recargar(String tokenTecnico, long valor) throws Exception {
-        return enviar(tokenTecnico, "/api/v1/billetera/recargas", "{\"valorCop\":" + valor + "}").andReturn()
+        return enviar(tokenTecnico, "/api/v1/wallet/topups", "{\"valorCop\":" + valor + "}").andReturn()
                 .getResponse().getContentAsString();
     }
 
     /** Crea una solicitud, el técnico se postula y el hogar lo asigna: el servicio queda en E03. */
     protected long asignado(String hogar, String tecnico, String descripcion) throws Exception {
-        long sol = ((Number) campo(enviar(hogar, "/api/v1/solicitudes", solicitudJson(descripcion)), "$.id")).longValue();
-        long pos = ((Number) campo(enviar(tecnico, "/api/v1/solicitudes/" + sol + "/postulaciones",
+        long sol = ((Number) campo(enviar(hogar, "/api/v1/service-requests", solicitudJson(descripcion)), "$.id")).longValue();
+        long pos = ((Number) campo(enviar(tecnico, "/api/v1/service-requests/" + sol + "/applications",
                 "{\"precioCop\":20000}"), "$.id")).longValue();
-        enviar(hogar, "/api/v1/solicitudes/" + sol + "/asignacion", "{\"postulacionId\":" + pos + "}").andExpect(status().isOk());
+        enviar(hogar, "/api/v1/applications/" + pos + "/select", null).andExpect(status().isOk());
         return sol;
     }
 
     /** Del servicio asignado (E03) hasta la confirmación del hogar (E05). */
     protected void finalizar(String hogar, String tecnico, long sol) throws Exception {
-        enviar(tecnico, "/api/v1/solicitudes/" + sol + "/llegada", null).andExpect(status().isOk());
-        enviar(tecnico, "/api/v1/solicitudes/" + sol + "/trabajo-terminado", null).andExpect(status().isOk());
-        enviar(hogar, "/api/v1/solicitudes/" + sol + "/confirmacion", null).andExpect(status().isOk());
+        enviar(tecnico, "/api/v1/service-requests/" + sol + "/arrive", null).andExpect(status().isOk());
+        enviar(tecnico, "/api/v1/service-requests/" + sol + "/complete", null).andExpect(status().isOk());
+        enviar(hogar, "/api/v1/service-requests/" + sol + "/confirm", null).andExpect(status().isOk());
     }
 
     protected org.springframework.test.web.servlet.ResultActions subirFoto(String token, long sol, byte[] bytes, String tipo)
             throws Exception {
         var archivo = new org.springframework.mock.web.MockMultipartFile("foto", "foto", tipo, bytes);
         return mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
-                .multipart("/api/v1/solicitudes/" + sol + "/fotos").file(archivo)
+                .multipart("/api/v1/service-requests/" + sol + "/photos").file(archivo)
                 .header("Authorization", "Bearer " + token));
     }
 

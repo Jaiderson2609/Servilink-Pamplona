@@ -6,7 +6,6 @@ import co.edu.unipamplona.servilink.repositorio.FotoRepositorio;
 import co.edu.unipamplona.servilink.repositorio.SolicitudRepositorio;
 import java.time.Clock;
 import java.util.List;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,24 +32,23 @@ public class FotoService {
     public Resumen subir(Long hogarId, Long solicitudId, byte[] contenido) {
         Solicitud s = solicitudes.bloquear(solicitudId).orElseThrow(SolicitudService::noEncontrada);
         if (!s.getHogarId().equals(hogarId)) {
-            throw new ErrorNegocio(HttpStatus.FORBIDDEN, "Sin permiso", "Solo el hogar de la solicitud agrega fotos");
+            throw new ErrorNegocio(Codigo.FORBIDDEN, "Solo el hogar de la solicitud agrega fotos");
         }
         if (!List.of("E01", "E02", "E03").contains(s.getEstado())) {
-            throw new ErrorNegocio(HttpStatus.CONFLICT, "Estado invalido", "Ya no se pueden agregar fotos a esta solicitud");
+            throw new ErrorNegocio(Codigo.INVALID_STATE_TRANSITION, "Ya no se pueden agregar fotos a esta solicitud");
         }
         if (contenido == null || contenido.length == 0) {
-            throw new ErrorNegocio(HttpStatus.BAD_REQUEST, "Solicitud invalida", "La foto está vacía");
+            throw new ErrorNegocio(Codigo.VALIDATION_ERROR, "La foto está vacía");
         }
         if (contenido.length > MAX_BYTES) {
-            throw new ErrorNegocio(HttpStatus.PAYLOAD_TOO_LARGE, "Archivo muy grande", "Cada foto puede pesar hasta 2 MB");
+            throw new ErrorNegocio(Codigo.PAYLOAD_TOO_LARGE, "Cada foto puede pesar hasta 2 MB");
         }
         String tipo = tipoPorContenido(contenido);
         if (tipo == null) {
-            throw new ErrorNegocio(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "Formato no soportado",
-                    "Solo se aceptan imágenes JPEG, PNG o WebP");
+            throw new ErrorNegocio(Codigo.UNSUPPORTED_MEDIA_TYPE, "Solo se aceptan imágenes JPEG, PNG o WebP");
         }
         if (fotos.countBySolicitudId(solicitudId) >= MAX_FOTOS) {
-            throw new ErrorNegocio(HttpStatus.CONFLICT, "Limite de fotos", "Cada solicitud admite hasta 3 fotos");
+            throw new ErrorNegocio(Codigo.PHOTO_LIMIT_REACHED, "Cada solicitud admite hasta 3 fotos");
         }
         FotoSolicitud f = fotos.save(new FotoSolicitud(solicitudId, hogarId, tipo, contenido, reloj.instant()));
         return new Resumen(f.getId(), f.getTipoMime(), f.getTamanoBytes(), f.getCreadaEn());
@@ -67,14 +65,14 @@ public class FotoService {
     public FotoSolicitud obtener(Long usuarioId, String rol, Long solicitudId, Long fotoId) {
         exigirVisibilidad(solicitudes.findById(solicitudId).orElseThrow(SolicitudService::noEncontrada), usuarioId, rol);
         return fotos.findByIdAndSolicitudId(fotoId, solicitudId).orElseThrow(
-                () -> new ErrorNegocio(HttpStatus.NOT_FOUND, "No encontrado", "Foto inexistente"));
+                () -> new ErrorNegocio(Codigo.NOT_FOUND, "Foto inexistente"));
     }
 
     /** Las ven el hogar, el técnico asignado y, mientras la solicitud está abierta, cualquier técnico que pueda cotizarla. */
     private void exigirVisibilidad(Solicitud s, Long usuarioId, String rol) {
         boolean abiertaParaTecnicos = "TECNICO".equals(rol) && List.of("E01", "E02").contains(s.getEstado());
         if (!Participacion.esParte(s, usuarioId) && !abiertaParaTecnicos) {
-            throw new ErrorNegocio(HttpStatus.FORBIDDEN, "Sin permiso", "No puedes ver las fotos de esta solicitud");
+            throw new ErrorNegocio(Codigo.FORBIDDEN, "No puedes ver las fotos de esta solicitud");
         }
     }
 

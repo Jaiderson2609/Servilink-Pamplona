@@ -1,0 +1,25 @@
+# Uso: $env:JWT_SECRET="..." ; $env:ADMIN_CLAVE="..." ; docker compose -f docker-compose.app.yml up --build
+services:
+  db:
+    image: postgis/postgis:17-3.5
+    environment:
+      POSTGRES_DB: servilink
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?defina DB_PASSWORD}
+    volumes: [datos:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d servilink"]
+      interval: 5s
+      retries: 10
+  app:
+    build: { context: ., dockerfile: docker/Dockerfile.app }
+    depends_on: { db: { condition: service_healthy } }
+    ports: ["8080:8080"]
+    environment:
+      DB_URL: jdbc:postgresql://db:5432/servilink
+      DB_USER: postgres
+      DB_PASSWORD: ${DB_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET:?defina JWT_SECRET (mínimo 32 caracteres)}
+      ADMIN_CORREO: ${ADMIN_CORREO:-admin@servilink.co}
+      ADMIN_CLAVE: ${ADMIN_CLAVE:?defina ADMIN_CLAVE}
+volumes:
+  datos:

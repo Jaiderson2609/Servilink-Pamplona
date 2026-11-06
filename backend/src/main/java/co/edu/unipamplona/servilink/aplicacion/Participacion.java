@@ -1,7 +1,6 @@
 package co.edu.unipamplona.servilink.aplicacion;
 
 import co.edu.unipamplona.servilink.dominio.Solicitud;
-import org.springframework.http.HttpStatus;
 
 /** Quién es quién en una solicitud: el hogar dueño o el técnico asignado. */
 final class Participacion {
@@ -13,7 +12,7 @@ final class Participacion {
 
     static void exigirParte(Solicitud s, Long usuarioId) {
         if (!esParte(s, usuarioId)) {
-            throw new ErrorNegocio(HttpStatus.FORBIDDEN, "Sin permiso", "No participas en este servicio");
+            throw new ErrorNegocio(Codigo.FORBIDDEN, "No participas en este servicio");
         }
     }
 

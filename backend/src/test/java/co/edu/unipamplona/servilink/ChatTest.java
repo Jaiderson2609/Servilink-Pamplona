@@ -22,17 +22,17 @@ class ChatTest extends PruebaApi {
 
     @Test
     void antesDeAsignarNoHayChat() throws Exception {
-        long sol = ((Number) campo(enviar(hogar, "/api/v1/solicitudes", solicitudJson("Cambiar un tomacorriente roto")), "$.id")).longValue();
-        enviar(hogar, "/api/v1/solicitudes/" + sol + "/mensajes", msg("Hola")).andExpect(status().isConflict())
-                .andExpect(jsonPath("$.title").value("Chat cerrado"));
-        pedir(hogar, "/api/v1/solicitudes/" + sol + "/mensajes").andExpect(status().isConflict())
-                .andExpect(jsonPath("$.title").value("Chat no disponible"));
+        long sol = ((Number) campo(enviar(hogar, "/api/v1/service-requests", solicitudJson("Cambiar un tomacorriente roto")), "$.id")).longValue();
+        enviar(hogar, "/api/v1/service-requests/" + sol + "/messages", msg("Hola")).andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value("CHAT_CLOSED"));
+        pedir(hogar, "/api/v1/service-requests/" + sol + "/messages").andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value("CHAT_CLOSED"));
     }
 
     @Test
     void ambosEscribenYLeenEnOrdenYMarcaCuálesSonSuyos() throws Exception {
         long sol = asignado(hogar, tecnico, "Cambiar un tomacorriente roto");
-        String url = "/api/v1/solicitudes/" + sol + "/mensajes";
+        String url = "/api/v1/service-requests/" + sol + "/messages";
         enviar(hogar, url, msg("¿A qué hora llega?")).andExpect(status().isCreated()).andExpect(jsonPath("$.mio").value(true));
         enviar(tecnico, url, msg("En 20 minutos")).andExpect(status().isCreated());
         pedir(hogar, url).andExpect(jsonPath("$.length()").value(2)).andExpect(jsonPath("$[0].texto").value("¿A qué hora llega?"))
@@ -43,7 +43,7 @@ class ChatTest extends PruebaApi {
     @Test
     void laConsultaIncrementalSoloTraeLoNuevo() throws Exception {
         long sol = asignado(hogar, tecnico, "Cambiar un tomacorriente roto");
-        String url = "/api/v1/solicitudes/" + sol + "/mensajes";
+        String url = "/api/v1/service-requests/" + sol + "/messages";
         long primero = ((Number) campo(enviar(hogar, url, msg("uno")), "$.id")).longValue();
         enviar(tecnico, url, msg("dos"));
         enviar(hogar, url, msg("tres"));
@@ -55,7 +55,7 @@ class ChatTest extends PruebaApi {
     @Test
     void soloLasPartesParticipan() throws Exception {
         long sol = asignado(hogar, tecnico, "Cambiar un tomacorriente roto");
-        String url = "/api/v1/solicitudes/" + sol + "/mensajes";
+        String url = "/api/v1/service-requests/" + sol + "/messages";
         String intruso = cuenta("HOGAR", "intruso@correo.co");
         String otroTecnico = cuenta("TECNICO", "otro@correo.co");
         enviar(intruso, url, msg("hola")).andExpect(status().isForbidden());
@@ -68,7 +68,7 @@ class ChatTest extends PruebaApi {
     @Test
     void validaElTexto() throws Exception {
         long sol = asignado(hogar, tecnico, "Cambiar un tomacorriente roto");
-        String url = "/api/v1/solicitudes/" + sol + "/mensajes";
+        String url = "/api/v1/service-requests/" + sol + "/messages";
         enviar(hogar, url, msg("   ")).andExpect(status().isBadRequest());
         enviar(hogar, url, "{}").andExpect(status().isBadRequest());
         enviar(hogar, url, msg("a".repeat(501))).andExpect(status().isBadRequest());
@@ -78,20 +78,20 @@ class ChatTest extends PruebaApi {
     @Test
     void alFinalizarSeConservaElHistorialPeroSeCierraLaEscritura() throws Exception {
         long sol = asignado(hogar, tecnico, "Cambiar un tomacorriente roto");
-        String url = "/api/v1/solicitudes/" + sol + "/mensajes";
+        String url = "/api/v1/service-requests/" + sol + "/messages";
         enviar(hogar, url, msg("Gracias por venir"));
-        enviar(tecnico, "/api/v1/solicitudes/" + sol + "/llegada", null);
+        enviar(tecnico, "/api/v1/service-requests/" + sol + "/arrive", null);
         enviar(tecnico, url, msg("Ya llegué")).andExpect(status().isCreated());   // E04 sigue abierto
-        enviar(tecnico, "/api/v1/solicitudes/" + sol + "/trabajo-terminado", null);
-        enviar(hogar, "/api/v1/solicitudes/" + sol + "/confirmacion", null);
-        enviar(hogar, url, msg("¿Todo bien?")).andExpect(status().isConflict()).andExpect(jsonPath("$.title").value("Chat cerrado"));
+        enviar(tecnico, "/api/v1/service-requests/" + sol + "/complete", null);
+        enviar(hogar, "/api/v1/service-requests/" + sol + "/confirm", null);
+        enviar(hogar, url, msg("¿Todo bien?")).andExpect(status().isUnprocessableEntity()).andExpect(jsonPath("$.code").value("CHAT_CLOSED"));
         pedir(hogar, url).andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(2));
     }
 
     @Test
     void unaSolicitudCanceladaSinTecnicoNuncaTuvoChat() throws Exception {
-        long sol = ((Number) campo(enviar(hogar, "/api/v1/solicitudes", solicitudJson("Cambiar un tomacorriente roto")), "$.id")).longValue();
-        enviar(hogar, "/api/v1/solicitudes/" + sol + "/cancelacion", null).andExpect(status().isOk());
-        pedir(hogar, "/api/v1/solicitudes/" + sol + "/mensajes").andExpect(status().isConflict());
+        long sol = ((Number) campo(enviar(hogar, "/api/v1/service-requests", solicitudJson("Cambiar un tomacorriente roto")), "$.id")).longValue();
+        enviar(hogar, "/api/v1/service-requests/" + sol + "/cancel", null).andExpect(status().isOk());
+        pedir(hogar, "/api/v1/service-requests/" + sol + "/messages").andExpect(status().isUnprocessableEntity());
     }
 }

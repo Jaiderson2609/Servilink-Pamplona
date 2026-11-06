@@ -18,7 +18,7 @@ class FotosTest extends PruebaApi {
         hogar = cuenta("HOGAR", "hogar@correo.co");
         tecnico = cuenta("TECNICO", "tec@correo.co");
         recargar(tecnico, 50_000);
-        sol = ((Number) campo(enviar(hogar, "/api/v1/solicitudes", solicitudJson("Cambiar un tomacorriente roto")), "$.id")).longValue();
+        sol = ((Number) campo(enviar(hogar, "/api/v1/service-requests", solicitudJson("Cambiar un tomacorriente roto")), "$.id")).longValue();
     }
 
     @Test
@@ -28,11 +28,11 @@ class FotosTest extends PruebaApi {
                 .andExpect(header().exists("Location")).andExpect(jsonPath("$.tipoMime").value("image/jpeg"))
                 .andExpect(jsonPath("$.tamanoBytes").value(500));
         long fotoId = ((Number) campo(r, "$.id")).longValue();
-        byte[] bajada = pedir(hogar, "/api/v1/solicitudes/" + sol + "/fotos/" + fotoId).andExpect(status().isOk())
+        byte[] bajada = pedir(hogar, "/api/v1/service-requests/" + sol + "/photos/" + fotoId).andExpect(status().isOk())
                 .andExpect(content().contentType("image/jpeg")).andExpect(header().string("X-Content-Type-Options", "nosniff"))
                 .andReturn().getResponse().getContentAsByteArray();
         assertThat(bajada).isEqualTo(original);
-        pedir(hogar, "/api/v1/solicitudes/" + sol + "/fotos").andExpect(jsonPath("$.length()").value(1))
+        pedir(hogar, "/api/v1/service-requests/" + sol + "/photos").andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].id").value(fotoId)).andExpect(jsonPath("$[0].contenido").doesNotExist());
     }
 
@@ -57,7 +57,7 @@ class FotosTest extends PruebaApi {
         subirFoto(hogar, sol, jpeg(100), "image/jpeg").andExpect(status().isCreated());
         subirFoto(hogar, sol, jpeg(100), "image/jpeg").andExpect(status().isCreated());
         subirFoto(hogar, sol, jpeg(100), "image/jpeg").andExpect(status().isConflict())
-                .andExpect(jsonPath("$.title").value("Limite de fotos"));
+                .andExpect(jsonPath("$.code").value("PHOTO_LIMIT_REACHED"));
         assertThat(jdbc.queryForObject("SELECT count(*) FROM fotos_solicitud", Integer.class)).isEqualTo(3);
     }
 
@@ -72,14 +72,14 @@ class FotosTest extends PruebaApi {
     @Test
     void quienPuedeVerLasFotos() throws Exception {
         long fotoId = ((Number) campo(subirFoto(hogar, sol, jpeg(100), "image/jpeg"), "$.id")).longValue();
-        String url = "/api/v1/solicitudes/" + sol + "/fotos/" + fotoId;
+        String url = "/api/v1/service-requests/" + sol + "/photos/" + fotoId;
         pedir(tecnico, url).andExpect(status().isOk());                      // técnico que puede cotizar (E01)
         pedir(cuenta("HOGAR", "otro@correo.co"), url).andExpect(status().isForbidden()); // otro hogar
         pedir(null, url).andExpect(status().isUnauthorized());
-        pedir(hogar, "/api/v1/solicitudes/" + sol + "/fotos/9999").andExpect(status().isNotFound());
+        pedir(hogar, "/api/v1/service-requests/" + sol + "/photos/9999").andExpect(status().isNotFound());
 
-        long pos = ((Number) campo(enviar(tecnico, "/api/v1/solicitudes/" + sol + "/postulaciones", "{\"precioCop\":20000}"), "$.id")).longValue();
-        enviar(hogar, "/api/v1/solicitudes/" + sol + "/asignacion", "{\"postulacionId\":" + pos + "}").andExpect(status().isOk());
+        long pos = ((Number) campo(enviar(tecnico, "/api/v1/service-requests/" + sol + "/applications", "{\"precioCop\":20000}"), "$.id")).longValue();
+        enviar(hogar, "/api/v1/applications/" + pos + "/select", null).andExpect(status().isOk());
         String ajeno = cuenta("TECNICO", "ajeno@correo.co");
         pedir(ajeno, url).andExpect(status().isForbidden());                // ya asignada: el técnico ajeno no la ve
         pedir(tecnico, url).andExpect(status().isOk());                     // el asignado sí
@@ -91,6 +91,6 @@ class FotosTest extends PruebaApi {
         String h2 = campo(enviar(null, "/api/v1/auth/login", "{\"correo\":\"h2@correo.co\",\"clave\":\"clave-segura-1\"}"), "$.accessToken");
         subirFoto(h2, s2, jpeg(100), "image/jpeg").andExpect(status().isCreated()); // E03 todavía permite
         finalizar(h2, tecnico, s2);
-        subirFoto(h2, s2, jpeg(100), "image/jpeg").andExpect(status().isConflict()).andExpect(jsonPath("$.title").value("Estado invalido"));
+        subirFoto(h2, s2, jpeg(100), "image/jpeg").andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("INVALID_STATE_TRANSITION"));
     }
 }

@@ -7,7 +7,6 @@ import co.edu.unipamplona.servilink.repositorio.SolicitudRepositorio;
 import co.edu.unipamplona.servilink.repositorio.UsuarioRepositorio;
 import java.time.Clock;
 import java.time.Instant;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,10 +37,10 @@ public class CalificacionService {
         Solicitud s = solicitudes.bloquear(solicitudId).orElseThrow(SolicitudService::noEncontrada);
         Participacion.exigirParte(s, usuarioId);
         if (!"E05".equals(s.getEstado())) {
-            throw new ErrorNegocio(HttpStatus.CONFLICT, "Servicio no finalizado", "Solo se califica un servicio finalizado");
+            throw new ErrorNegocio(Codigo.INVALID_STATE_TRANSITION, "Solo se califica un servicio finalizado");
         }
         if (calificaciones.existsBySolicitudIdAndAutorId(solicitudId, usuarioId)) {
-            throw new ErrorNegocio(HttpStatus.CONFLICT, "Calificacion duplicada", "Ya calificaste este servicio");
+            throw new ErrorNegocio(Codigo.DUPLICATE_RATING, "Ya calificaste este servicio");
         }
         String texto = comentario == null || comentario.isBlank() ? null : comentario.strip();
         Calificacion c = calificaciones.save(new Calificacion(solicitudId, usuarioId,
@@ -54,7 +53,7 @@ public class CalificacionService {
     public Reputacion reputacion(Long tecnicoId) {
         boolean existe = usuarios.findById(tecnicoId).map(u -> "TECNICO".equals(u.getRol())).orElse(false);
         if (!existe) {
-            throw new ErrorNegocio(HttpStatus.NOT_FOUND, "No encontrado", "Técnico inexistente");
+            throw new ErrorNegocio(Codigo.NOT_FOUND, "Técnico inexistente");
         }
         return resumen(tecnicoId);
     }
