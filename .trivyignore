@@ -1,0 +1,3 @@
+# Hallazgos aceptados temporalmente. Cada línea debe justificarse y tener fecha de revisión.
+# Formato: CVE-AAAA-NNNN  # motivo · revisar: AAAA-MM-DD
+# (vacío: no hay hallazgos aceptados; se llenará solo si el escaneo reporta falsos positivos)
