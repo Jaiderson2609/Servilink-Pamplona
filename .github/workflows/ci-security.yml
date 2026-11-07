@@ -1,0 +1,71 @@
+name: Seguridad (DevSecOps)
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  schedule:
+    - cron: "17 8 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  trivy:
+    name: Trivy · dependencias, secretos e imagen
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      TRIVY_VERSION: "0.72.0"
+    steps:
+      - uses: actions/checkout@v6
+      # Trivy se instala desde el binario oficial publicado en GitHub Releases, sin usar
+      # la acción de terceros por etiqueta (las etiquetas de trivy-action fueron
+      # comprometidas en 2026).
+      - name: Instalar Trivy ${{ env.TRIVY_VERSION }}
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP"
+          BASE="https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}"
+          curl -fsSLO "${BASE}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+          curl -fsSLO "${BASE}/trivy_${TRIVY_VERSION}_checksums.txt"
+          grep "trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz" "trivy_${TRIVY_VERSION}_checksums.txt" | sha256sum -c -
+          tar -xzf "trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz" trivy
+          sudo mv trivy /usr/local/bin/trivy
+          trivy --version
+      - name: Escaneo del repositorio (CVE en dependencias y secretos)
+        run: |
+          trivy fs --scanners vuln,secret --severity CRITICAL,HIGH --ignore-unfixed \
+            --ignorefile .trivyignore --exit-code 1 .
+      - name: Construir imagen
+        run: docker build -f docker/Dockerfile.app -t servilink:scan .
+      - name: Escaneo de la imagen
+        run: |
+          trivy image --severity CRITICAL,HIGH --ignore-unfixed \
+            --ignorefile .trivyignore --exit-code 1 servilink:scan
+      - name: Informe completo (tabla) para revisión
+        if: always()
+        run: |
+          trivy fs --scanners vuln --severity CRITICAL,HIGH,MEDIUM --format table \
+            --output trivy-informe.txt . || true
+          cat trivy-informe.txt || true
+      # El informe no se sube como artefacto: el repositorio es público y los artefactos
+      # serían visibles. Se consulta en el log del job y se resume en el documento.
+
+  semgrep:
+    name: Semgrep · análisis estático de seguridad
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Instalar Semgrep
+        run: pip install "semgrep==1.100.0"
+      - name: Escaneo (falla con severidad ERROR)
+        run: |
+          semgrep scan --config p/java --config p/owasp-top-ten --config p/secrets \
+            --severity ERROR --error --metrics=off \
+            backend/src/main frontend/src

@@ -15,6 +15,8 @@ COPY --from=web /web/dist/ ./src/main/resources/static/
 RUN mvn -B -q package -DskipTests
 
 FROM eclipse-temurin:21-jre
+ARG GIT_SHA=desconocido
+ENV COMMIT_SHA=$GIT_SHA
 RUN useradd -r -u 10001 servilink
 USER servilink
 COPY --from=api /api/target/servilink-backend-0.0.1-SNAPSHOT.jar /app.jar

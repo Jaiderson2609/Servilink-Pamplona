@@ -1,0 +1,132 @@
+name: Despliegue continuo
+
+# Se ejecuta al integrar en main (después de que el PR pasó los checks obligatorios).
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      imagen_rollback:
+        description: "Etiqueta de imagen a restaurar (vacío = desplegar el commit actual)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-produccion
+  cancel-in-progress: false
+
+env:
+  REGISTRO: ghcr.io
+  IMAGEN: ghcr.io/jaiderson2609/servilink-pamplona
+
+jobs:
+  construir:
+    name: 1 · Construir y publicar imagen
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      etiqueta: ${{ steps.meta.outputs.etiqueta }}
+    steps:
+      - uses: actions/checkout@v6
+      - id: meta
+        env:
+          ROLLBACK: ${{ github.event.inputs.imagen_rollback }}
+        run: |
+          if [ -n "$ROLLBACK" ]; then
+            case "$ROLLBACK" in
+              *[!A-Za-z0-9._-]*) echo "Etiqueta no válida"; exit 1;;
+            esac
+            echo "etiqueta=$ROLLBACK" >> "$GITHUB_OUTPUT"
+          else
+            echo "etiqueta=sha-${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: docker/setup-buildx-action@v3
+        if: ${{ github.event.inputs.imagen_rollback == '' }}
+      - uses: docker/login-action@v3
+        if: ${{ github.event.inputs.imagen_rollback == '' }}
+        with:
+          registry: ${{ env.REGISTRO }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        if: ${{ github.event.inputs.imagen_rollback == '' }}
+        with:
+          context: .
+          file: docker/Dockerfile.app
+          push: true
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+          tags: |
+            ${{ env.IMAGEN }}:${{ steps.meta.outputs.etiqueta }}
+            ${{ env.IMAGEN }}:latest
+
+  desplegar:
+    name: 2 · Desplegar y verificar
+    needs: construir
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: produccion
+    env:
+      RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+      URL_PUBLICA: ${{ secrets.URL_PUBLICA }}
+      ETIQUETA: ${{ needs.construir.outputs.etiqueta }}
+      COMMIT_ANTERIOR: ${{ github.event.before }}
+    steps:
+      - name: Validar secretos
+        run: |
+          test -n "$RENDER_DEPLOY_HOOK" || { echo "Falta el secreto RENDER_DEPLOY_HOOK"; exit 1; }
+          test -n "$URL_PUBLICA" || { echo "Falta el secreto URL_PUBLICA"; exit 1; }
+
+      - name: Identificar la imagen estable anterior
+        id: previa
+        run: |
+          # La imagen estable es la del commit anterior en main (ya desplegada y verificada).
+          if [ -n "$COMMIT_ANTERIOR" ] && [ "$COMMIT_ANTERIOR" != "0000000000000000000000000000000000000000" ]; then
+            echo "estable=sha-${COMMIT_ANTERIOR::12}" >> "$GITHUB_OUTPUT"
+          else
+            echo "estable=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Disparar despliegue en Render
+        run: |
+          IMG="${IMAGEN}:${ETIQUETA}"
+          ENC=$(python3 -c "import urllib.parse,sys;print(urllib.parse.quote(sys.argv[1],safe=''))" "$IMG")
+          CODIGO=$(curl -s -o /dev/null -w '%{http_code}' "${RENDER_DEPLOY_HOOK}&imgURL=${ENC}")
+          echo "Render respondió HTTP $CODIGO"
+          case "$CODIGO" in 200|202) ;; *) echo "Fallo al disparar el despliegue"; exit 1;; esac
+
+      - name: Healthcheck posterior al despliegue
+        id: salud
+        run: |
+          # Versión que debe responder: los 12 primeros caracteres del commit de la etiqueta sha-...
+          case "$ETIQUETA" in sha-*) ESPERADO="${ETIQUETA#sha-}";; *) ESPERADO="";; esac
+          for i in $(seq 1 40); do
+            R=$(curl -s -m 10 "${URL_PUBLICA}/actuator/health" || true)
+            V=$(curl -s -m 10 "${URL_PUBLICA}/actuator/info" || true)
+            if echo "$R" | grep -q '"status":"UP"' && echo "$V" | grep -q "$ESPERADO"; then
+              echo "Servicio saludable y con la versión esperada (intento $i): $V"
+              exit 0
+            fi
+            echo "Intento $i/40: aún no responde la versión esperada; espero 10 s"
+            sleep 10
+          done
+          echo "El servicio no quedó saludable con la versión $ESPERADO"
+          exit 1
+
+      - name: Rollback a la imagen estable anterior
+        if: ${{ failure() && steps.previa.outputs.estable != '' }}
+        env:
+          ESTABLE_PREVIA: ${{ steps.previa.outputs.estable }}
+        run: |
+          IMG="${IMAGEN}:${ESTABLE_PREVIA}"
+          ENC=$(python3 -c "import urllib.parse,sys;print(urllib.parse.quote(sys.argv[1],safe=''))" "$IMG")
+          echo "Restaurando $IMG"
+          curl -s -o /dev/null -w 'Render respondió HTTP %{http_code}\n' "${RENDER_DEPLOY_HOOK}&imgURL=${ENC}"
+          sleep 60
+          curl -fsS -m 10 "${URL_PUBLICA}/actuator/health"
