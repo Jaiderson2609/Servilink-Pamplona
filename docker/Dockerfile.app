@@ -17,6 +17,10 @@ RUN mvn -B -q package -DskipTests
 FROM eclipse-temurin:21-jre
 ARG GIT_SHA=desconocido
 ENV COMMIT_SHA=$GIT_SHA
+# CVE-2026-109518 (apt, HIGH): la imagen base trae apt 3.2.0; se actualiza a la versión corregida.
+RUN apt-get update \
+ && apt-get install -y --only-upgrade apt libapt-pkg7.0 \
+ && rm -rf /var/lib/apt/lists/*
 RUN useradd -r -u 10001 servilink
 USER servilink
 COPY --from=api /api/target/servilink-backend-0.0.1-SNAPSHOT.jar /app.jar
