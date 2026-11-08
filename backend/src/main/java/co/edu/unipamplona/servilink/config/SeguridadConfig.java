@@ -23,6 +23,34 @@ import org.springframework.security.web.SecurityFilterChain;
 @Configuration
 public class SeguridadConfig {
 
+    /**
+     * Las métricas de Prometheus dicen cuánto tráfico y cuántos errores tiene el servicio: no son públicas.
+     * Se leen con HTTP Basic (Prometheus no sabe renovar un JWT). Si METRICAS_CLAVE no está definida o tiene
+     * menos de 16 caracteres, el endpoint queda cerrado para todos.
+     */
+    @Bean
+    @org.springframework.core.annotation.Order(1)
+    SecurityFilterChain metricas(HttpSecurity http, PasswordEncoder codificador,
+                                 @org.springframework.beans.factory.annotation.Value("${servilink.metricas-usuario:prometheus}") String usuario,
+                                 @org.springframework.beans.factory.annotation.Value("${servilink.metricas-clave:}") String clave)
+            throws Exception {
+        http.securityMatcher("/actuator/prometheus")
+                .csrf(AbstractHttpConfigurer::disable)
+                .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
+        if (clave == null || clave.length() < 16) {
+            http.authorizeHttpRequests(a -> a.anyRequest().denyAll());
+        } else {
+            var cuentas = new org.springframework.security.provisioning.InMemoryUserDetailsManager(
+                    org.springframework.security.core.userdetails.User.withUsername(usuario)
+                            .password(codificador.encode(clave)).roles("METRICAS").build());
+            http.userDetailsService(cuentas)
+                    .authorizeHttpRequests(a -> a.anyRequest().hasRole("METRICAS"))
+                    .httpBasic(Customizer.withDefaults());
+        }
+        return http.build();
+    }
+
+
     @Bean
     SecurityFilterChain cadena(HttpSecurity http, org.springframework.jdbc.core.JdbcTemplate jdbc, java.time.Clock reloj)
             throws Exception {
