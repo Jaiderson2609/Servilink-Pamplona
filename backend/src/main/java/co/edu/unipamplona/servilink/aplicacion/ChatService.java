@@ -1,5 +1,6 @@
 package co.edu.unipamplona.servilink.aplicacion;
 
+import co.edu.unipamplona.servilink.dominio.EstadoSolicitud;
 import co.edu.unipamplona.servilink.dominio.Mensaje;
 import co.edu.unipamplona.servilink.dominio.Solicitud;
 import co.edu.unipamplona.servilink.repositorio.MensajeRepositorio;
@@ -33,7 +34,7 @@ public class ChatService {
     public Vista enviar(Long usuarioId, Long solicitudId, String texto) {
         Solicitud s = solicitudes.findById(solicitudId).orElseThrow(SolicitudService::noEncontrada);
         Participacion.exigirParte(s, usuarioId);
-        if (!List.of("E03", "E04").contains(s.getEstado())) {
+        if (!EstadoSolicitud.esUnoDe(s.getEstado(), EstadoSolicitud.E03, EstadoSolicitud.E04)) {
             throw new ErrorNegocio(Codigo.CHAT_CLOSED, "El chat solo está abierto mientras el servicio está en curso");
         }
         String limpio = texto == null ? "" : texto.strip();

@@ -1,5 +1,6 @@
 package co.edu.unipamplona.servilink.web;
 
+import co.edu.unipamplona.servilink.dominio.EstadoSolicitud;
 import co.edu.unipamplona.servilink.aplicacion.AsignacionService;
 import co.edu.unipamplona.servilink.aplicacion.ErrorNegocio;
 import co.edu.unipamplona.servilink.aplicacion.NotificacionService;
@@ -56,7 +57,7 @@ public class ApplicationController {
                     .log("Asignación procesada");
             return ResponseEntity.ok(Map.of(
                     "solicitudId", r.solicitudId(),
-                    "estado", "E03",
+                    "estado", EstadoSolicitud.E03.codigo(),
                     "comisionRetenidaCop", r.comisionCop(),
                     "contacto", Map.of("nombre", r.nombreTecnico(), "telefono", r.telefonoTecnico())));
         } catch (ErrorNegocio e) {

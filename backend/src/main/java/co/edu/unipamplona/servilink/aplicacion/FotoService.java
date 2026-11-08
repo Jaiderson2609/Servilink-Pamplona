@@ -1,5 +1,6 @@
 package co.edu.unipamplona.servilink.aplicacion;
 
+import co.edu.unipamplona.servilink.dominio.EstadoSolicitud;
 import co.edu.unipamplona.servilink.dominio.FotoSolicitud;
 import co.edu.unipamplona.servilink.dominio.Solicitud;
 import co.edu.unipamplona.servilink.repositorio.FotoRepositorio;
@@ -34,7 +35,7 @@ public class FotoService {
         if (!s.getHogarId().equals(hogarId)) {
             throw new ErrorNegocio(Codigo.FORBIDDEN, "Solo el hogar de la solicitud agrega fotos");
         }
-        if (!List.of("E01", "E02", "E03").contains(s.getEstado())) {
+        if (!EstadoSolicitud.esUnoDe(s.getEstado(), EstadoSolicitud.E01, EstadoSolicitud.E02, EstadoSolicitud.E03)) {
             throw new ErrorNegocio(Codigo.INVALID_STATE_TRANSITION, "Ya no se pueden agregar fotos a esta solicitud");
         }
         if (contenido == null || contenido.length == 0) {
@@ -70,7 +71,7 @@ public class FotoService {
 
     /** Las ven el hogar, el técnico asignado y, mientras la solicitud está abierta, cualquier técnico que pueda cotizarla. */
     private void exigirVisibilidad(Solicitud s, Long usuarioId, String rol) {
-        boolean abiertaParaTecnicos = "TECNICO".equals(rol) && List.of("E01", "E02").contains(s.getEstado());
+        boolean abiertaParaTecnicos = "TECNICO".equals(rol) && EstadoSolicitud.esUnoDe(s.getEstado(), EstadoSolicitud.E01, EstadoSolicitud.E02);
         if (!Participacion.esParte(s, usuarioId) && !abiertaParaTecnicos) {
             throw new ErrorNegocio(Codigo.FORBIDDEN, "No puedes ver las fotos de esta solicitud");
         }

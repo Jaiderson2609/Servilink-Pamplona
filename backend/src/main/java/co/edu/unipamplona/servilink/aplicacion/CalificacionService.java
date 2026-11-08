@@ -1,5 +1,6 @@
 package co.edu.unipamplona.servilink.aplicacion;
 
+import co.edu.unipamplona.servilink.dominio.EstadoSolicitud;
 import co.edu.unipamplona.servilink.dominio.Calificacion;
 import co.edu.unipamplona.servilink.dominio.Solicitud;
 import co.edu.unipamplona.servilink.repositorio.CalificacionRepositorio;
@@ -36,7 +37,7 @@ public class CalificacionService {
     public Vista calificar(Long usuarioId, Long solicitudId, int estrellas, String comentario) {
         Solicitud s = solicitudes.bloquear(solicitudId).orElseThrow(SolicitudService::noEncontrada);
         Participacion.exigirParte(s, usuarioId);
-        if (!"E05".equals(s.getEstado())) {
+        if (!EstadoSolicitud.E05.es(s.getEstado())) {
             throw new ErrorNegocio(Codigo.INVALID_STATE_TRANSITION, "Solo se califica un servicio finalizado");
         }
         if (calificaciones.existsBySolicitudIdAndAutorId(solicitudId, usuarioId)) {
