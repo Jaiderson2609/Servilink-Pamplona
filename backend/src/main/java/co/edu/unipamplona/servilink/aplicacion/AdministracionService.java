@@ -1,5 +1,6 @@
 package co.edu.unipamplona.servilink.aplicacion;
 
+import co.edu.unipamplona.servilink.dominio.EstadoSolicitud;
 import co.edu.unipamplona.servilink.dominio.AuditoriaAdmin;
 import co.edu.unipamplona.servilink.dominio.Movimiento;
 import co.edu.unipamplona.servilink.dominio.Solicitud;
@@ -20,7 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class AdministracionService {
 
     public static final List<String> ROLES = List.of("HOGAR", "TECNICO", "ADMIN");
-    public static final List<String> ESTADOS = List.of("E01", "E02", "E03", "E04", "E05", "E06", "E07");
+    public static final List<String> ESTADOS = Arrays.stream(EstadoSolicitud.values()).map(EstadoSolicitud::codigo).toList();
 
     private final UsuarioRepositorio usuarios;
     private final SolicitudRepositorio solicitudes;
@@ -108,7 +109,7 @@ public class AdministracionService {
 
     @Transactional(readOnly = true)
     public Pagina<SolicitudAdmin> solicitudes(String estado, int pagina, int tamano) {
-        if (estado != null && !ESTADOS.contains(estado)) {
+        if (estado != null && !EstadoSolicitud.existe(estado)) {
             throw invalida("estado debe ser E01 a E07");
         }
         var pedido = pedido(pagina, tamano, "id");

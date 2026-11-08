@@ -46,7 +46,7 @@ public class Solicitud {
         this.lat = lat;
         this.lng = lng;
         this.descripcion = descripcion;
-        this.estado = "E01";
+        this.estado = EstadoSolicitud.E01.codigo();
         this.expiraEn = expiraEn;
         this.creadaEn = creadaEn;
     }

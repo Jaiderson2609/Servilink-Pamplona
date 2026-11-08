@@ -34,10 +34,10 @@ public class EjecucionService {
     public Efecto<SolicitudService.Vista> llegada(Long tecnicoId, Long solicitudId) {
         Solicitud s = solicitudes.bloquear(solicitudId).orElseThrow(SolicitudService::noEncontrada);
         exigirTecnico(s, tecnicoId);
-        if (!"E03".equals(s.getEstado())) {
+        if (!EstadoSolicitud.E03.es(s.getEstado())) {
             throw estadoInvalido(s);
         }
-        s.setEstado("E04");
+        s.setEstado(EstadoSolicitud.E04.codigo());
         Long aviso = aviso("LLEG-" + s.getId(), s.getHogarId(), "El técnico llegó a tu domicilio");
         return new Efecto<>(consultas.vista(s, tecnicoId, "TECNICO"), aviso);
     }
@@ -47,7 +47,7 @@ public class EjecucionService {
     public Efecto<SolicitudService.Vista> trabajoTerminado(Long tecnicoId, Long solicitudId) {
         Solicitud s = solicitudes.bloquear(solicitudId).orElseThrow(SolicitudService::noEncontrada);
         exigirTecnico(s, tecnicoId);
-        if (!"E04".equals(s.getEstado())) {
+        if (!EstadoSolicitud.E04.es(s.getEstado())) {
             throw estadoInvalido(s);
         }
         if (s.getTerminadoEn() != null) {
@@ -63,10 +63,10 @@ public class EjecucionService {
     public Efecto<SolicitudService.Vista> confirmar(Long hogarId, Long solicitudId) {
         Solicitud s = solicitudes.bloquear(solicitudId).orElseThrow(SolicitudService::noEncontrada);
         exigirHogar(s, hogarId);
-        if ("E05".equals(s.getEstado())) {
+        if (EstadoSolicitud.E05.es(s.getEstado())) {
             return Efecto.sinAviso(consultas.vista(s, hogarId, "HOGAR")); // reintento idempotente
         }
-        if (!"E04".equals(s.getEstado())) {
+        if (!EstadoSolicitud.E04.es(s.getEstado())) {
             throw estadoInvalido(s);
         }
         if (s.getTerminadoEn() == null) {
@@ -77,7 +77,7 @@ public class EjecucionService {
         b.cobrar(comision);
         libro.save(new Movimiento(b.getTecnicoId(), s.getId(), "COMISION", comision, b.getDisponible(),
                 "COM-" + s.getId(), reloj.instant()));
-        s.setEstado("E05");
+        s.setEstado(EstadoSolicitud.E05.codigo());
         Long aviso = aviso("FIN-" + s.getId(), s.getTecnicoId(), "El hogar confirmó el trabajo. ¡Gracias!");
         return new Efecto<>(consultas.vista(s, hogarId, "HOGAR"), aviso);
     }
@@ -88,12 +88,12 @@ public class EjecucionService {
         Solicitud s = solicitudes.bloquear(solicitudId).orElseThrow(SolicitudService::noEncontrada);
         String estado = s.getEstado();
         Long avisoId = null;
-        if ("E01".equals(estado) || "E02".equals(estado)) {
+        if (EstadoSolicitud.esUnoDe(estado, EstadoSolicitud.E01, EstadoSolicitud.E02)) {
             if (!"HOGAR".equals(rol)) {
                 throw new ErrorNegocio(Codigo.FORBIDDEN, "Solo el hogar cancela antes de asignar");
             }
             exigirHogar(s, usuarioId);
-        } else if ("E03".equals(estado) || "E04".equals(estado)) {
+        } else if (EstadoSolicitud.esUnoDe(estado, EstadoSolicitud.E03, EstadoSolicitud.E04)) {
             if ("HOGAR".equals(rol)) {
                 exigirHogar(s, usuarioId);
             } else {
@@ -112,7 +112,7 @@ public class EjecucionService {
         } else {
             throw estadoInvalido(s);
         }
-        s.setEstado("E07");
+        s.setEstado(EstadoSolicitud.E07.codigo());
         s.setCanceladaPor(rol);
         s.setMotivoCancelacion(motivo == null || motivo.isBlank() ? null : motivo.trim());
         return new Efecto<>(consultas.vista(s, usuarioId, rol), avisoId);
@@ -125,13 +125,13 @@ public class EjecucionService {
     @Transactional
     public Efecto<Solicitud> cancelarAdministrativa(Long solicitudId, String motivo) {
         Solicitud s = solicitudes.bloquear(solicitudId).orElseThrow(SolicitudService::noEncontrada);
-        if (!java.util.List.of("E01", "E02", "E03", "E04").contains(s.getEstado())) {
+        if (!EstadoSolicitud.esUnoDe(s.getEstado(), EstadoSolicitud.E01, EstadoSolicitud.E02, EstadoSolicitud.E03, EstadoSolicitud.E04)) {
             throw estadoInvalido(s);
         }
         if (motivo == null || motivo.trim().length() < 5) {
             throw new ErrorNegocio(Codigo.VALIDATION_ERROR, "El motivo debe tener al menos 5 caracteres");
         }
-        boolean asignada = s.getTecnicoId() != null && java.util.List.of("E03", "E04").contains(s.getEstado());
+        boolean asignada = s.getTecnicoId() != null && EstadoSolicitud.esUnoDe(s.getEstado(), EstadoSolicitud.E03, EstadoSolicitud.E04);
         if (asignada) {
             Billetera b = billeteras.bloquear(s.getTecnicoId()).orElseThrow();
             long comision = s.getComisionCop();
@@ -141,7 +141,7 @@ public class EjecucionService {
             aviso("CANCA-" + s.getId() + "-T", s.getTecnicoId(), "Un administrador canceló el servicio");
         }
         Long avisoHogar = aviso("CANCA-" + s.getId() + "-H", s.getHogarId(), "Un administrador canceló tu solicitud");
-        s.setEstado("E07");
+        s.setEstado(EstadoSolicitud.E07.codigo());
         s.setCanceladaPor("ADMIN");
         s.setMotivoCancelacion(motivo.trim());
         return new Efecto<>(s, avisoHogar);

@@ -14,7 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class SolicitudService {
 
-    public static final List<String> ACTIVAS = List.of("E01", "E02", "E03", "E04");
+    public static final List<String> ACTIVAS = EstadoSolicitud.codigos(EstadoSolicitud.E01, EstadoSolicitud.E02, EstadoSolicitud.E03, EstadoSolicitud.E04);
 
     public record Contacto(String nombre, String telefono) {}
 
@@ -71,7 +71,7 @@ public class SolicitudService {
     @Transactional
     public VistaPostulacion postular(Long tecnicoId, Long solicitudId, int precio, String mensaje) {
         Solicitud s = solicitudes.bloquear(solicitudId).orElseThrow(SolicitudService::noEncontrada);
-        if (!"E01".equals(s.getEstado()) && !"E02".equals(s.getEstado())) {
+        if (!EstadoSolicitud.esUnoDe(s.getEstado(), EstadoSolicitud.E01, EstadoSolicitud.E02)) {
             throw new ErrorNegocio(Codigo.INVALID_STATE_TRANSITION, "La solicitud está en " + s.getEstado());
         }
         Instant ahora = reloj.instant();
@@ -85,12 +85,12 @@ public class SolicitudService {
         if (saldo < config.saldoMinimo()) { // RF-039
             throw new ErrorNegocio(Codigo.WALLET_BELOW_MINIMUM, "Se necesita un saldo mínimo de " + config.saldoMinimo() + " COP para postularse");
         }
-        if (solicitudes.existsByTecnicoIdAndEstadoIn(tecnicoId, List.of("E03", "E04"))) { // RN-07
+        if (solicitudes.existsByTecnicoIdAndEstadoIn(tecnicoId, EstadoSolicitud.codigos(EstadoSolicitud.E03, EstadoSolicitud.E04))) { // RN-07
             throw new ErrorNegocio(Codigo.TECHNICIAN_UNAVAILABLE, "Ya tienes un servicio activo");
         }
         Postulacion p = postulaciones.save(new Postulacion(solicitudId, tecnicoId, precio, mensaje, ahora));
-        if ("E01".equals(s.getEstado())) {
-            s.setEstado("E02");
+        if (EstadoSolicitud.E01.es(s.getEstado())) {
+            s.setEstado(EstadoSolicitud.E02.codigo());
             s.setExpiraEn(ahora.plus(Duration.ofMinutes(config.ventanaEleccionMin())));
         }
         return vistaPostulacion(p);
@@ -125,7 +125,7 @@ public class SolicitudService {
         return lista.stream().map(s -> vista(s, usuarioId, rol)).toList();
     }
 
-    /** Solicitudes que aún reciben postulaciones. El filtro por oficio y radio (PostGIS) queda pendiente. */
+    /** Solicitudes que aún reciben postulaciones. Si el técnico definió su zona, se filtra por radio (PostGIS); el filtro por oficio sigue pendiente. */
     @Transactional(readOnly = true)
     public List<Vista> abiertas(Long tecnicoId) {
         Instant ahora = reloj.instant();
@@ -139,7 +139,7 @@ public class SolicitudService {
                     .map(c -> vista(porId.get(c.getId()), tecnicoId, "TECNICO", (int) Math.round(c.getDistancia())))
                     .toList();
         }
-        return solicitudes.findByEstadoInAndExpiraEnAfterOrderByIdDesc(List.of("E01", "E02"), ahora)
+        return solicitudes.findByEstadoInAndExpiraEnAfterOrderByIdDesc(EstadoSolicitud.codigos(EstadoSolicitud.E01, EstadoSolicitud.E02), ahora)
                 .stream().map(s -> vista(s, tecnicoId, "TECNICO")).toList();
     }
 
@@ -156,7 +156,7 @@ public class SolicitudService {
 
     Vista vista(Solicitud s, Long usuarioId, String rol, Integer distanciaM) {
         Contacto contacto = null;
-        if (List.of("E03", "E04", "E05").contains(s.getEstado()) && s.getTecnicoId() != null) {
+        if (EstadoSolicitud.esUnoDe(s.getEstado(), EstadoSolicitud.E03, EstadoSolicitud.E04, EstadoSolicitud.E05) && s.getTecnicoId() != null) {
             Long otroId = "HOGAR".equals(rol) ? s.getTecnicoId() : s.getHogarId();
             contacto = usuarios.findById(otroId).map(u -> new Contacto(u.getNombre(), u.getTelefono())).orElse(null);
         }

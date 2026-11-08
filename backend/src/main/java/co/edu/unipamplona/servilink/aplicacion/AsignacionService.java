@@ -63,18 +63,18 @@ public class AsignacionService {
                 .orElseThrow(() -> new ErrorNegocio(Codigo.NOT_FOUND, "El técnico no tiene billetera"));
         Usuario tecnico = usuarios.findById(pos.getTecnicoId()).orElseThrow();
 
-        if ("E03".equals(sol.getEstado()) && pos.getTecnicoId().equals(sol.getTecnicoId())) {
+        if (EstadoSolicitud.E03.es(sol.getEstado()) && pos.getTecnicoId().equals(sol.getTecnicoId())) {
             // Reintento idempotente: mismo técnico, misma solicitud. No se cobra ni se avisa dos veces.
             return new Resultado(sol.getId(), sol.getComisionCop(), tecnico.getNombre(), tecnico.getTelefono(), null);
         }
-        if (!"E02".equals(sol.getEstado())) {
+        if (!EstadoSolicitud.E02.es(sol.getEstado())) {
             throw new ErrorNegocio(Codigo.INVALID_STATE_TRANSITION, "La solicitud está en " + sol.getEstado());
         }
         Instant ahora = reloj.instant();
         if (!ahora.isBefore(sol.getExpiraEn())) { // RN-02: el servidor decide con su propio reloj
             throw new ErrorNegocio(Codigo.SERVICE_EXPIRED, "La ventana de selección terminó");
         }
-        if (solicitudes.existsByTecnicoIdAndEstadoIn(pos.getTecnicoId(), List.of("E03", "E04"))) { // RN-07
+        if (solicitudes.existsByTecnicoIdAndEstadoIn(pos.getTecnicoId(), EstadoSolicitud.codigos(EstadoSolicitud.E03, EstadoSolicitud.E04))) { // RN-07
             throw new ErrorNegocio(Codigo.TECHNICIAN_UNAVAILABLE, "El técnico ya tiene un servicio activo");
         }
         long comision = comision(pos.getPrecio(), config.comision());
@@ -85,7 +85,7 @@ public class AsignacionService {
         libro.save(new Movimiento(billetera.getTecnicoId(), sol.getId(), "RETENCION", comision,
                 billetera.getDisponible(), "ASIG-" + sol.getId(), ahora));
 
-        sol.setEstado("E03");
+        sol.setEstado(EstadoSolicitud.E03.codigo());
         sol.setTecnicoId(pos.getTecnicoId());
         sol.setPrecioAcordado(pos.getPrecio());
         sol.setComisionPct(config.comision()); // RN-14: el porcentaje queda congelado para este servicio
