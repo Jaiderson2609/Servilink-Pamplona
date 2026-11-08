@@ -1,0 +1,10 @@
+global:
+  scrape_interval: 15s
+scrape_configs:
+  - job_name: servilink
+    metrics_path: /actuator/prometheus
+    basic_auth:
+      username: prometheus
+      password_file: /tmp/clave_metricas   # la escribe el arranque del contenedor desde METRICAS_CLAVE; no vive en el repositorio
+    static_configs:
+      - targets: ["app:8080"]

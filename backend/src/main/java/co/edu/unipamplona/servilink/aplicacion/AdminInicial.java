@@ -33,7 +33,7 @@ public class AdminInicial implements ApplicationRunner {
             throw new IllegalStateException("Define ADMIN_CORREO y ADMIN_CLAVE juntas, o ninguna");
         }
         if (auth.asegurarAdmin(correo, clave)) {
-            log.info("Administrador inicial creado: {}", correo);
+            log.info("Administrador inicial creado");
         }
     }
 }

@@ -1,0 +1,74 @@
+# Stack local de observabilidad (FPI-29): la aplicación, Prometheus (métricas), Grafana (panel) y Jaeger (trazas).
+# Uso (PowerShell, desde la raíz del repositorio):
+#   $env:DB_PASSWORD="..." ; $env:JWT_SECRET="..." ; $env:ADMIN_CLAVE="..." ; $env:METRICAS_CLAVE="..." ; $env:GRAFANA_CLAVE="..."
+#   docker compose -f docker/observabilidad/docker-compose.yml up --build -d
+# Todo se publica solo en 127.0.0.1: nada de esto queda expuesto fuera de tu equipo.
+name: servilink-obs
+services:
+  db:
+    image: postgis/postgis:17-3.5
+    environment:
+      POSTGRES_DB: servilink
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?defina DB_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d servilink"]
+      interval: 5s
+      retries: 10
+  app:
+    build: { context: ../.., dockerfile: docker/Dockerfile.app }
+    depends_on: { db: { condition: service_healthy } }
+    ports: ["127.0.0.1:8080:8080"]
+    environment:
+      DB_URL: jdbc:postgresql://db:5432/servilink
+      DB_USER: postgres
+      DB_PASSWORD: ${DB_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET:?defina JWT_SECRET (mínimo 32 caracteres)}
+      ADMIN_CORREO: ${ADMIN_CORREO:-admin@servilink.co}
+      ADMIN_CLAVE: ${ADMIN_CLAVE:?defina ADMIN_CLAVE}
+      METRICAS_CLAVE: ${METRICAS_CLAVE:?defina METRICAS_CLAVE (mínimo 16 caracteres)}
+      # Solo para esta demostración local: recargas de saldo sin pasarela de pagos y 100 % de las trazas.
+      SERVILINK_RECARGA_DEMO_HABILITADA: "true"
+      TRAZAS_MUESTREO: "1.0"
+      OTEL_EXPORT: "true"
+      OTEL_ENDPOINT: http://jaeger:4318/v1/traces
+  prometheus:
+    image: prom/prometheus:v3.0.0
+    # Prometheus no lee variables de entorno en su configuración: el arranque guarda la clave en un archivo
+    # temporal (dentro del contenedor) y la configuración lo referencia con password_file.
+    entrypoint:
+      - /bin/sh
+      - -c
+      - 'printf "%s" "$$METRICAS_CLAVE" > /tmp/clave_metricas && exec /bin/prometheus --config.file=/etc/prometheus/prometheus.yml --storage.tsdb.path=/prometheus --storage.tsdb.retention.time=7d'
+    environment:
+      METRICAS_CLAVE: ${METRICAS_CLAVE}
+    volumes: ["./prometheus.yml:/etc/prometheus/prometheus.yml:ro"]
+    ports: ["127.0.0.1:9090:9090"]
+    depends_on: [app]
+  jaeger:
+    image: jaegertracing/all-in-one:1.62.0
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports: ["127.0.0.1:16686:16686"]
+  grafana:
+    image: grafana/grafana:11.5.0
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_CLAVE:?defina GRAFANA_CLAVE}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/servilink.json
+    volumes:
+      - ./grafana/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./grafana/dashboards/proveedor.yml:/etc/grafana/provisioning/dashboards/proveedor.yml:ro
+      - ./grafana/dashboards/servilink.json:/var/lib/grafana/dashboards/servilink.json:ro
+    ports: ["127.0.0.1:3000:3000"]
+    depends_on: [prometheus]
+  # Generador de tráfico (perfil "carga"): docker compose -f ... --profile carga run --rm carga
+  carga:
+    profiles: ["carga"]
+    image: node:22-alpine
+    working_dir: /carga
+    volumes: ["./carga.mjs:/carga/carga.mjs:ro"]
+    environment:
+      BASE_URL: http://app:8080
+      ITERACIONES: ${ITERACIONES:-60}
+    command: ["node", "carga.mjs"]
+    depends_on: [app]
