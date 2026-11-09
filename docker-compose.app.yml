@@ -1,7 +1,7 @@
 # Uso: $env:JWT_SECRET="..." ; $env:ADMIN_CLAVE="..." ; docker compose -f docker-compose.app.yml up --build
 services:
   db:
-    image: postgis/postgis:17-3.5
+    image: postgis/postgis:18-3.6
     environment:
       POSTGRES_DB: servilink
       POSTGRES_PASSWORD: ${DB_PASSWORD:?defina DB_PASSWORD}
