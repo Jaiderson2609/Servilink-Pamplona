@@ -103,6 +103,11 @@ jobs:
         with: { distribution: temurin, java-version: "21", cache: maven }
       - run: mvn -B verify
         working-directory: backend
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cobertura-backend-spring
+          path: backend/target/site/jacoco
   frontend:
     runs-on: ubuntu-latest
     steps:
