@@ -63,8 +63,8 @@ class IdempotenciaTest extends PruebaApi {
 
     @Test
     void laRecargaConClaveSeAcreditaUnaSolaVez() throws Exception {
-        enviar(tecnico, "/api/v1/wallet/topups", "{\"valorCop\":10000}", CLAVE).andExpect(status().isOk());
-        enviar(tecnico, "/api/v1/wallet/topups", "{\"valorCop\":10000}", CLAVE).andExpect(status().isOk())
+        enviar(tecnico, "/api/v1/wallet/topups/demo", "{\"valorCop\":10000}", CLAVE).andExpect(status().isOk());
+        enviar(tecnico, "/api/v1/wallet/topups/demo", "{\"valorCop\":10000}", CLAVE).andExpect(status().isOk())
                 .andExpect(header().string("Idempotent-Replay", "true"));
         pedir(tecnico, "/api/v1/wallet").andExpect(jsonPath("$.saldoDisponibleCop").value(60_000));
     }
@@ -72,7 +72,7 @@ class IdempotenciaTest extends PruebaApi {
     @Test
     void unaClaveNoSirveParaOtraOperacion() throws Exception {
         enviar(hogar, "/api/v1/service-requests", solicitudJson("Cambiar un tomacorriente roto"), CLAVE).andExpect(status().isCreated());
-        enviar(tecnico, "/api/v1/wallet/topups", "{\"valorCop\":10000}", CLAVE).andExpect(status().isOk()); // otro usuario: la misma clave es independiente
+        enviar(tecnico, "/api/v1/wallet/topups/demo", "{\"valorCop\":10000}", CLAVE).andExpect(status().isOk()); // otro usuario: la misma clave es independiente
         enviar(tecnico, "/api/v1/service-requests/1/applications", "{\"precioCop\":20000}", CLAVE).andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
     }
@@ -102,7 +102,7 @@ class IdempotenciaTest extends PruebaApi {
     @Test
     void laLimpiezaBorraLasClavesVencidas() throws Exception {
         enviar(hogar, "/api/v1/service-requests", solicitudJson("Cambiar un tomacorriente roto"), CLAVE).andExpect(status().isCreated());
-        enviar(tecnico, "/api/v1/wallet/topups", "{\"valorCop\":10000}", "otra-clave-0002").andExpect(status().isOk());
+        enviar(tecnico, "/api/v1/wallet/topups/demo", "{\"valorCop\":10000}", "otra-clave-0002").andExpect(status().isOk());
         jdbc.update("UPDATE claves_idempotencia SET creada_en = ? WHERE clave = ?",
                 java.sql.Timestamp.from(reloj.instant().minus(Duration.ofHours(25))), CLAVE);
         assertThat(limpieza.limpiar()).isEqualTo(1);

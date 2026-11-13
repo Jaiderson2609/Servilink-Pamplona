@@ -72,7 +72,7 @@ public abstract class PruebaApi extends PruebaIntegracion {
     }
 
     protected String recargar(String tokenTecnico, long valor) throws Exception {
-        return enviar(tokenTecnico, "/api/v1/wallet/topups", "{\"valorCop\":" + valor + "}").andReturn()
+        return enviar(tokenTecnico, "/api/v1/wallet/topups/demo", "{\"valorCop\":" + valor + "}").andReturn()
                 .getResponse().getContentAsString();
     }
 

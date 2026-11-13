@@ -86,8 +86,8 @@ class AuthTest extends PruebaApi {
     @Test
     void laRecargaDeDemostracionExigeUnValorValido() throws Exception {
         String tecnico = cuenta("TECNICO", "tec@correo.co");
-        enviar(tecnico, "/api/v1/wallet/topups", "{\"valorCop\":10}").andExpect(status().isBadRequest());
-        enviar(tecnico, "/api/v1/wallet/topups", "{\"valorCop\":50000}").andExpect(status().isOk())
+        enviar(tecnico, "/api/v1/wallet/topups/demo", "{\"valorCop\":10}").andExpect(status().isBadRequest());
+        enviar(tecnico, "/api/v1/wallet/topups/demo", "{\"valorCop\":50000}").andExpect(status().isOk())
                 .andExpect(jsonPath("$.saldoDisponibleCop").value(50000))
                 .andExpect(jsonPath("$.movimientos[0].tipo").value("RECARGA"));
     }

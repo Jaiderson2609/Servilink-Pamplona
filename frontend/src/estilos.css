@@ -68,6 +68,9 @@ textarea { min-height: 96px; resize: vertical; }
 .buscar-direccion input { flex: 1; min-width: 0; }
 .resultados-direccion { list-style: none; margin: .4rem 0 0; padding: 0; display: grid; gap: .4rem; }
 .resultados-direccion .btn { width: 100%; height: auto; text-align: left; white-space: normal; }
+.resultado-pago { border-left: 4px solid var(--verde); }
+.resultado-pago.error { border-left-color: var(--rojo); }
+.resultado-pago.info { border-left-color: var(--ambar); }
 .dos { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
 .chequeo { display: flex; gap: .55rem; align-items: flex-start; font-weight: 500; }
 .chequeo input { width: auto; margin-top: .3rem; }

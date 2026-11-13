@@ -26,3 +26,6 @@ export function cuentaAtras(expiraEn, ahora = Date.now()) {
 
 /** Clave nueva para Idempotency-Key: 32 caracteres hexadecimales. */
 export const nuevaLlave = () => (globalThis.crypto?.randomUUID?.() ?? `${Date.now()}${Math.random()}`.replace(/\D/g, '')).replace(/-/g, '').padEnd(16, '0');
+
+/** Lleva al usuario a otra dirección (el pago en Wompi). Aparte para poder sustituirla en las pruebas. */
+export const irA = (url) => window.location.assign(url);

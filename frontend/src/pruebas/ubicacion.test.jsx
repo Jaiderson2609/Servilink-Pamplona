@@ -91,12 +91,12 @@ describe('búsqueda de direcciones', () => {
     expect(screen.getByRole('button', { name: 'Buscar' })).toBeEnabled(); // se puede volver a intentar
   });
 
-  it('con demasiadas búsquedas en espera lo dice con claridad', async () => {
+  it('con demasiadas peticiones seguidas lo dice con claridad', async () => {
     preparar({ 'GET /geocoding/search': [429, { code: 'RATE_LIMITED', message: 'x', traceId: 't' }] });
     pintar(<Contenedor />);
     await userEvent.type(screen.getByLabelText('Buscar dirección'), 'Pamplona');
     await userEvent.click(screen.getByRole('button', { name: 'Buscar' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('Intenta de nuevo en unos segundos');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Espera un poco e intenta de nuevo');
   });
 
   it('mientras busca el botón queda deshabilitado, para no repetir la consulta', async () => {

@@ -480,7 +480,58 @@ paths:
   /wallet/topups:
     post:
       tags: [Billetera]
-      summary: Recargar el saldo (recarga de demostración mientras no se active Wompi)
+      summary: Iniciar una recarga con Wompi
+      description: >-
+        Crea un intento de recarga PENDING con una referencia única y devuelve la dirección del pago en Wompi
+        (Web Checkout, modo de pruebas hasta la entrega). No mueve dinero: el saldo sube solo cuando llega el
+        evento firmado de Wompi (POST /webhooks/wompi) con el pago aprobado. Máximo 5 intentos por hora.
+      parameters:
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RecargaCrear' }
+      responses:
+        '201':
+          description: Intento creado; el cliente redirige al técnico a urlPago
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RecargaIniciada' }
+        '400': { $ref: '#/components/responses/Invalida' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '429':
+          description: Demasiados intentos de recarga en la última hora (RATE_LIMITED)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorApi' }
+        '503':
+          description: Wompi no está configurado en este entorno (PAYMENT_UNAVAILABLE)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorApi' }
+  /wallet/topups/{referencia}:
+    get:
+      tags: [Billetera]
+      summary: Consultar el estado de una recarga propia
+      description: La pantalla a la que vuelve el técnico después de pagar la consulta hasta que deja de estar PENDING.
+      parameters:
+        - { name: referencia, in: path, required: true, schema: { type: string, maxLength: 40 } }
+      responses:
+        '200':
+          description: Estado de la recarga
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EstadoRecarga' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+  /wallet/topups/demo:
+    post:
+      tags: [Billetera]
+      summary: Recarga de demostración (solo si el servidor la habilita)
+      description: Sustituto de Wompi para demostraciones. Responde 404 cuando no está habilitada, que es el caso de producción.
       parameters:
         - { $ref: '#/components/parameters/IdempotencyKey' }
       requestBody:
@@ -498,6 +549,34 @@ paths:
         '401': { $ref: '#/components/responses/NoAutenticado' }
         '403': { $ref: '#/components/responses/SinPermiso' }
         '404': { $ref: '#/components/responses/NoEncontrado' }
+  /webhooks/wompi:
+    post:
+      tags: [Billetera]
+      summary: Evento firmado de Wompi
+      description: >-
+        Lo llama Wompi, no un usuario: no lleva JWT. La autenticidad la da la firma (SHA-256 de los campos de
+        signature.properties tomados de data, más timestamp y el secreto de eventos), que viene en
+        signature.checksum y en la cabecera X-Event-Checksum. Un pago APPROVED con el monto de la recarga la
+        acredita una sola vez; repetir el evento responde 200 sin cambios.
+      security: []
+      parameters:
+        - { name: X-Event-Checksum, in: header, required: false, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EventoWompi' }
+      responses:
+        '200':
+          description: Evento procesado, ignorado o ya procesado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ResultadoEvento' }
+        '401':
+          description: La firma no coincide (INVALID_SIGNATURE)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorApi' }
   /admin/summary:
     get:
       tags: [Administración]
@@ -894,6 +973,43 @@ components:
         lng: { type: number }
         radioKm: { type: integer }
         actualizadaEn: { type: string, format: date-time }
+    RecargaIniciada:
+      type: object
+      required: [referencia, valorCop, estado, urlPago]
+      properties:
+        referencia: { type: string, example: SL-3f1c2a9e-8d4b-4c5e-9a67-0b1d2e3f4a5b }
+        valorCop: { type: integer, example: 50000 }
+        estado: { type: string, enum: [PENDING] }
+        urlPago: { type: string, format: uri, description: Web Checkout de Wompi con el monto y la firma de integridad }
+    EstadoRecarga:
+      type: object
+      required: [referencia, valorCop, estado]
+      properties:
+        referencia: { type: string }
+        valorCop: { type: integer }
+        estado:
+          type: string
+          enum: [PENDING, APPROVED, FAILED, REVIEW]
+          description: REVIEW = pago aprobado cuyo monto o transacción no cuadran; no se acredita y lo revisa un administrador
+    EventoWompi:
+      type: object
+      required: [event, data, signature, timestamp]
+      properties:
+        event: { type: string, example: transaction.updated }
+        data: { type: object, additionalProperties: true }
+        signature:
+          type: object
+          required: [properties, checksum]
+          properties:
+            properties: { type: array, items: { type: string }, example: [transaction.id, transaction.status, transaction.amount_in_cents] }
+            checksum: { type: string }
+        timestamp: { type: integer, format: int64 }
+        sent_at: { type: string }
+    ResultadoEvento:
+      type: object
+      required: [estado]
+      properties:
+        estado: { type: string, enum: [PENDING, APPROVED, FAILED, REVIEW, IGNORADO] }
     RecargaCrear:
       type: object
       required: [valorCop]
@@ -905,6 +1021,8 @@ components:
       properties:
         saldoDisponibleCop: { type: integer, example: 24000 }
         saldoRetenidoCop: { type: integer, example: 2000 }
+        pagoDisponible: { type: boolean, description: Hay llaves de Wompi configuradas en este entorno }
+        recargaDemoDisponible: { type: boolean, description: El servidor habilita la recarga de demostración }
         movimientos:
           type: array
           items:
