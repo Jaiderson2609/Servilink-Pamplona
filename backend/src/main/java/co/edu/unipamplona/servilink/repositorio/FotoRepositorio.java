@@ -17,6 +17,8 @@ public interface FotoRepositorio extends JpaRepository<FotoSolicitud, Long> {
         Integer getTamanoBytes();
 
         Instant getCreadaEn();
+
+        String getUrl();
     }
 
     List<Resumen> findBySolicitudIdOrderByIdAsc(Long solicitudId);
@@ -24,4 +26,6 @@ public interface FotoRepositorio extends JpaRepository<FotoSolicitud, Long> {
     long countBySolicitudId(Long solicitudId);
 
     Optional<FotoSolicitud> findByIdAndSolicitudId(Long id, Long solicitudId);
+
+    Optional<FotoSolicitud> findByPublicId(String publicId);
 }

@@ -18,6 +18,9 @@ public class FotoSolicitud {
     @Column(name = "tamano_bytes")
     private Integer tamanoBytes;
     private byte[] contenido;
+    @Column(name = "public_id")
+    private String publicId;
+    private String url;
     @Column(name = "creada_en")
     private Instant creadaEn;
 
@@ -32,10 +35,22 @@ public class FotoSolicitud {
         this.creadaEn = creadaEn;
     }
 
+    /** Foto alojada en Cloudinary: la base solo guarda su identificador y su dirección. */
+    public FotoSolicitud(Long solicitudId, Long subidaPor, String tipoMime, String publicId, String url, Instant creadaEn) {
+        this.solicitudId = solicitudId;
+        this.subidaPor = subidaPor;
+        this.tipoMime = tipoMime;
+        this.publicId = publicId;
+        this.url = url;
+        this.creadaEn = creadaEn;
+    }
+
     public Long getId() { return id; }
     public Long getSolicitudId() { return solicitudId; }
     public String getTipoMime() { return tipoMime; }
     public Integer getTamanoBytes() { return tamanoBytes; }
     public byte[] getContenido() { return contenido; }
+    public String getPublicId() { return publicId; }
+    public String getUrl() { return url; }
     public Instant getCreadaEn() { return creadaEn; }
 }

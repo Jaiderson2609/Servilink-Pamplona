@@ -52,8 +52,11 @@ public class SeguridadConfig {
 
 
     @Bean
-    SecurityFilterChain cadena(HttpSecurity http, org.springframework.jdbc.core.JdbcTemplate jdbc, java.time.Clock reloj)
-            throws Exception {
+    SecurityFilterChain cadena(HttpSecurity http, org.springframework.jdbc.core.JdbcTemplate jdbc, java.time.Clock reloj,
+            co.edu.unipamplona.servilink.aplicacion.AlmacenImagenes almacen) throws Exception {
+        // Si Cloudinary está configurado, el navegador puede mostrar sus imágenes y subirles directamente.
+        String imagenes = almacen.disponible() ? " " + almacen.origenEntrega() : "";
+        String conexiones = almacen.disponible() ? " " + almacen.origenSubida() : "";
         var autoridades = new JwtGrantedAuthoritiesConverter();
         autoridades.setAuthoritiesClaimName("rol");
         autoridades.setAuthorityPrefix("ROLE_");
@@ -72,6 +75,7 @@ public class SeguridadConfig {
                         .requestMatchers(HttpMethod.GET, "/", "/index.html", "/favicon.svg", "/manifest.webmanifest", "/sw.js",
                                 "/assets/**", "/icons/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/service-requests").hasRole("HOGAR")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/uploads/signature").hasRole("HOGAR")
                         .requestMatchers(HttpMethod.PATCH, "/api/v1/applications/*/select").hasRole("HOGAR")
                         .requestMatchers(HttpMethod.GET, "/api/v1/service-requests/*/applications").hasRole("HOGAR")
                         .requestMatchers(HttpMethod.PATCH, "/api/v1/service-requests/*/confirm").hasRole("HOGAR")
@@ -94,7 +98,8 @@ public class SeguridadConfig {
                         org.springframework.security.web.access.intercept.AuthorizationFilter.class)
                 .headers(h -> h
                         .contentSecurityPolicy(c -> c.policyDirectives("default-src 'self'; script-src 'self'; style-src 'self'; "
-                                + "img-src 'self' blob: data: https://tile.openstreetmap.org; connect-src 'self'; object-src 'none'; base-uri 'none'; "
+                                + "img-src 'self' blob: data: https://tile.openstreetmap.org" + imagenes + "; connect-src 'self'" + conexiones
+                                + "; object-src 'none'; base-uri 'none'; "
                                 + "form-action 'self'; frame-ancestors 'none'"))
                         .frameOptions(f -> f.deny())
                         .referrerPolicy(r -> r.policy(

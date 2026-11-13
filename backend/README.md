@@ -78,3 +78,17 @@ La llave privada de Wompi no se usa: el flujo no consulta su API. En el panel de
 
 `POST /api/v1/wallet/topups/demo` (recarga de demostración, solo con `servilink.recarga-demo-habilitada=true`) sigue existiendo para desarrollo local; en producción debe estar desactivada.
 
+
+## Fotos en Cloudinary
+
+Las fotos de una solicitud (máximo 3, hasta 2 MB, JPEG, PNG o WebP) se suben **directo desde el navegador** a Cloudinary con una firma que emite el servidor (DAD 3.2 y 10.2). El servidor solo firma y verifica: nunca llama a Cloudinary, y el secreto de la API no sale de él.
+
+1. `POST /api/v1/uploads/signature` `{solicitudId}`: solo el hogar dueño, con la solicitud en E01–E03 y cupo libre. El servidor fija el identificador (`servilink/solicitudes/{id}/{uuid}`), así que el cliente no lo elige. Límite de 20 firmas por usuario por hora.
+2. El navegador sube la imagen a `uploadUrl` con esos parámetros (sin enviar el token de ServiLink).
+3. `POST /api/v1/service-requests/{id}/photos/cloudinary` `{publicId, version, signature, format}`: se verifica la firma de la respuesta de Cloudinary (SHA-1 o SHA-256 de `public_id=…&version=…` más el secreto), el identificador debe pertenecer a esa solicitud y el registro es idempotente.
+
+Sin credenciales, `uploads/signature` responde 503 `UPLOAD_UNAVAILABLE` y el cliente usa el camino anterior (`POST …/photos`, que guarda los bytes en PostgreSQL), igual que si la subida a Cloudinary falla. Las fotos de ambos orígenes conviven (migración V8, un CHECK obliga a que cada foto viva en un solo lugar).
+
+Variables de entorno: `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`. Opcionales (solo para pruebas): `CLOUDINARY_UPLOAD_URL`, `CLOUDINARY_DELIVERY_URL`. Con Cloudinary configurado, la política de seguridad de contenido añade sus orígenes a `img-src` y `connect-src`; sin él, no.
+
+Limitaciones conocidas: el peso de 2 MB lo limita el navegador (Cloudinary admite hasta 10 MB en el plan gratuito) y las direcciones de las fotos son públicas pero no adivinables (identificador con UUID).

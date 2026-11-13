@@ -40,6 +40,21 @@ public class ParticipantesController {
         return ResponseEntity.created(URI.create("/api/v1/service-requests/" + solicitudId + "/photos/" + r.id())).body(r);
     }
 
+    /** Firma para que el navegador suba la foto directo a Cloudinary (DDS: /uploads/signature). */
+    @PostMapping("/uploads/signature")
+    public co.edu.unipamplona.servilink.aplicacion.AlmacenImagenes.Firma firmarSubida(
+            @Valid @RequestBody Peticiones.FirmaSubida p, @AuthenticationPrincipal Jwt jwt) {
+        return fotos.firmarSubida(id(jwt), p.solicitudId());
+    }
+
+    /** Registra la foto que el navegador ya subió a Cloudinary, verificando la firma de su respuesta. */
+    @PostMapping("/service-requests/{solicitudId}/photos/cloudinary")
+    public ResponseEntity<FotoService.Resumen> registrarFotoNube(@PathVariable Long solicitudId,
+            @Valid @RequestBody Peticiones.FotoNube f, @AuthenticationPrincipal Jwt jwt) {
+        var r = fotos.registrarNube(id(jwt), solicitudId, f.publicId(), f.version(), f.signature(), f.format());
+        return ResponseEntity.created(URI.create("/api/v1/service-requests/" + solicitudId + "/photos/" + r.id())).body(r);
+    }
+
     @GetMapping("/service-requests/{solicitudId}/photos")
     public List<FotoService.Resumen> listarFotos(@PathVariable Long solicitudId, @AuthenticationPrincipal Jwt jwt) {
         return fotos.listar(id(jwt), rol(jwt), solicitudId);
@@ -49,6 +64,9 @@ public class ParticipantesController {
     public ResponseEntity<byte[]> descargarFoto(@PathVariable Long solicitudId, @PathVariable Long fotoId,
             @AuthenticationPrincipal Jwt jwt) {
         var f = fotos.obtener(id(jwt), rol(jwt), solicitudId, fotoId);
+        if (f.getContenido() == null) {
+            return ResponseEntity.status(org.springframework.http.HttpStatus.FOUND).location(URI.create(f.getUrl())).build();
+        }
         return ResponseEntity.ok().contentType(MediaType.parseMediaType(f.getTipoMime()))
                 .cacheControl(CacheControl.noStore()).header("X-Content-Type-Options", "nosniff").body(f.getContenido());
     }

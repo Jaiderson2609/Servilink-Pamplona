@@ -37,6 +37,15 @@ public final class Peticiones {
     public record Recarga(
             @NotNull(message = "valorCop es obligatorio") @Min(value = 1000, message = "valorCop debe ser al menos 1000") @Max(value = 1_000_000, message = "valorCop excede el máximo") Long valorCop) {}
 
+    public record FirmaSubida(
+            @NotNull(message = "solicitudId es obligatorio") @Min(value = 1, message = "solicitudId no es válido") Long solicitudId) {}
+
+    public record FotoNube(
+            @NotBlank(message = "publicId es obligatorio") @Size(max = 200, message = "publicId es demasiado largo") String publicId,
+            @NotBlank(message = "version es obligatoria") @Pattern(regexp = "\\d{1,12}", message = "version no es válida") String version,
+            @NotBlank(message = "signature es obligatoria") @Size(max = 128, message = "signature es demasiado larga") String signature,
+            @Size(max = 10, message = "format es demasiado largo") String format) {}
+
     public record ZonaTrabajo(
             @NotNull(message = "lat es obligatoria") @DecimalMin(value = "-90", message = "lat fuera de rango") @DecimalMax(value = "90", message = "lat fuera de rango") Double lat,
             @NotNull(message = "lng es obligatoria") @DecimalMin(value = "-180", message = "lng fuera de rango") @DecimalMax(value = "180", message = "lng fuera de rango") Double lng,
