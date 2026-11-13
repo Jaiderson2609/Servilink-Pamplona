@@ -21,11 +21,14 @@ public class ChatService {
     private final SolicitudRepositorio solicitudes;
     private final MensajeRepositorio mensajes;
     private final Clock reloj;
+    private final PublicadorEventos eventos;
 
-    public ChatService(SolicitudRepositorio solicitudes, MensajeRepositorio mensajes, Clock reloj) {
+    public ChatService(SolicitudRepositorio solicitudes, MensajeRepositorio mensajes, Clock reloj,
+                       PublicadorEventos eventos) {
         this.solicitudes = solicitudes;
         this.mensajes = mensajes;
         this.reloj = reloj;
+        this.eventos = eventos;
     }
 
     public record Vista(Long id, Long autorId, String texto, Instant creadoEn, boolean mio) {}
@@ -42,6 +45,7 @@ public class ChatService {
             throw new ErrorNegocio(Codigo.VALIDATION_ERROR, "El mensaje debe tener entre 1 y 500 caracteres");
         }
         Mensaje m = mensajes.save(new Mensaje(solicitudId, usuarioId, limpio, reloj.instant()));
+        eventos.mensaje(s);
         return vista(m, usuarioId);
     }
 

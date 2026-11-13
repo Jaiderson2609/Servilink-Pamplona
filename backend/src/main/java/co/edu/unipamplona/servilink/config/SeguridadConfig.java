@@ -64,6 +64,8 @@ public class SeguridadConfig {
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(a -> a
                         .requestMatchers("/actuator/health", "/actuator/info", "/api/v1/auth/**").permitAll()
+                        // El apretón de manos del WebSocket no lleva JWT; el cliente se autentica con su primer mensaje.
+                        .requestMatchers(HttpMethod.GET, WebSocketConfig.RUTA).permitAll()
                         // La plataforma web (React compilado: página, assets, manifiesto y service worker) es pública; todo lo sensible vive detrás de /api.
                         .requestMatchers(HttpMethod.GET, "/", "/index.html", "/favicon.svg", "/manifest.webmanifest", "/sw.js",
                                 "/assets/**", "/icons/**").permitAll()

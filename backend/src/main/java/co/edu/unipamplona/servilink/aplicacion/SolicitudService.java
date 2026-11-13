@@ -35,11 +35,12 @@ public class SolicitudService {
     private final CalificacionRepositorio calificaciones;
     private final Configuracion config;
     private final Clock reloj;
+    private final PublicadorEventos eventos;
 
     public SolicitudService(SolicitudRepositorio solicitudes, PostulacionRepositorio postulaciones,
                             BilleteraRepositorio billeteras, OficioRepositorio oficios, UsuarioRepositorio usuarios,
                             UbicacionTecnicoRepositorio ubicaciones, CalificacionRepositorio calificaciones,
-                            Configuracion config, Clock reloj) {
+                            Configuracion config, Clock reloj, PublicadorEventos eventos) {
         this.solicitudes = solicitudes;
         this.postulaciones = postulaciones;
         this.billeteras = billeteras;
@@ -49,6 +50,7 @@ public class SolicitudService {
         this.calificaciones = calificaciones;
         this.config = config;
         this.reloj = reloj;
+        this.eventos = eventos;
     }
 
     /** TR-01: nace en E01 con una ventana de postulación; un hogar solo puede tener una solicitud activa (RN-06). */
@@ -64,6 +66,7 @@ public class SolicitudService {
         }
         Solicitud s = solicitudes.save(new Solicitud(hogarId, oficioId, descripcion.trim(), lat, lng,
                 ahora.plus(Duration.ofMinutes(config.ventanaPostulacionMin())), ahora));
+        eventos.solicitud(s);
         return vista(s, hogarId, "HOGAR");
     }
 
@@ -93,6 +96,7 @@ public class SolicitudService {
             s.setEstado(EstadoSolicitud.E02.codigo());
             s.setExpiraEn(ahora.plus(Duration.ofMinutes(config.ventanaEleccionMin())));
         }
+        eventos.solicitud(s);
         return vistaPostulacion(p);
     }
 
@@ -146,7 +150,12 @@ public class SolicitudService {
     /** RF-026: barrido de las solicitudes vencidas; lo invoca el trabajo programado. */
     @Transactional
     public int expirarVencidas() {
-        return solicitudes.expirarVencidas(reloj.instant());
+        Instant ahora = reloj.instant();
+        var vencidas = solicitudes.findByEstadoInAndExpiraEnLessThanEqual(
+                EstadoSolicitud.codigos(EstadoSolicitud.E01, EstadoSolicitud.E02), ahora);
+        int n = solicitudes.expirarVencidas(ahora);
+        vencidas.forEach(eventos::solicitud); // el hogar y los técnicos se enteran sin esperar al sondeo
+        return n;
     }
 
     /** El contacto de la contraparte se muestra solo a las partes y solo desde E03 (RF-015 y RF-036). */

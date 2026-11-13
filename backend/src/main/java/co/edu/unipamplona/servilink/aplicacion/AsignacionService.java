@@ -26,11 +26,12 @@ public class AsignacionService {
     private final UsuarioRepositorio usuarios;
     private final Configuracion config;
     private final Clock reloj;
+    private final PublicadorEventos eventos;
 
     public AsignacionService(SolicitudRepositorio solicitudes, PostulacionRepositorio postulaciones,
                              BilleteraRepositorio billeteras, MovimientoRepositorio libro,
                              NotificacionRepositorio avisos, UsuarioRepositorio usuarios,
-                             Configuracion config, Clock reloj) {
+                             Configuracion config, Clock reloj, PublicadorEventos eventos) {
         this.solicitudes = solicitudes;
         this.postulaciones = postulaciones;
         this.billeteras = billeteras;
@@ -39,6 +40,7 @@ public class AsignacionService {
         this.usuarios = usuarios;
         this.config = config;
         this.reloj = reloj;
+        this.eventos = eventos;
     }
 
     /** Solicitud a la que pertenece una postulación; la autorización la decide asignar() con el bloqueo tomado. */
@@ -98,6 +100,7 @@ public class AsignacionService {
         }
         NotificacionPendiente aviso = avisos.save(new NotificacionPendiente("ASIG-" + sol.getId(),
                 pos.getTecnicoId(), "Fuiste asignado a una solicitud", ahora));
+        eventos.solicitud(sol);
         return new Resultado(sol.getId(), comision, tecnico.getNombre(), tecnico.getTelefono(), aviso.getId());
     }
 

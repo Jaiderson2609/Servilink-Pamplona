@@ -62,6 +62,9 @@ public interface SolicitudRepositorio extends JpaRepository<Solicitud, Long> {
     @Query("update Solicitud s set s.estado = 'E06' where s.estado in ('E01', 'E02') and s.expiraEn <= :ahora")
     int expirarVencidas(Instant ahora);
 
+    /** Las solicitudes que el barrido de expiración va a pasar a E06 (para avisar a sus partes). */
+    java.util.List<Solicitud> findByEstadoInAndExpiraEnLessThanEqual(java.util.List<String> estados, Instant ahora);
+
     @Modifying
     @Query("update Solicitud s set s.estado = 'E06' where s.hogarId = :hogarId and s.estado in ('E01', 'E02') "
             + "and s.expiraEn <= :ahora")
