@@ -45,7 +45,7 @@ paths:
   /auth/login:
     post:
       tags: [Identidad]
-      summary: Iniciar sesión y obtener un JWT
+      summary: Iniciar sesión y obtener un JWT (de 15 min); la renovación llega en una cookie HttpOnly
       security: []
       requestBody:
         required: true
@@ -61,6 +61,34 @@ paths:
         '400': { $ref: '#/components/responses/Invalida' }
         '401': { $ref: '#/components/responses/NoAutenticado' }
         '403': { $ref: '#/components/responses/SinPermiso' }
+  /auth/refresh:
+    post:
+      tags: [Identidad]
+      summary: Renovar la sesión con la cookie de renovación (de un solo uso, con rotación)
+      description: >-
+        Lee la cookie HttpOnly `servilink_renovacion` (Secure, SameSite=Strict, Path=/api/v1/auth), la cambia por un
+        token de acceso nuevo y entrega otra cookie. Reutilizar un token ya gastado, fuera de una gracia de 10 s,
+        revoca toda la sesión. La cookie dura 7 días y una sesión no supera 30 días sin volver a iniciar.
+      security: []
+      responses:
+        '200':
+          description: Sesión renovada; `Set-Cookie` trae la cookie rotada (ausente solo dentro de la gracia de 10 s)
+          headers:
+            Set-Cookie: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TokenResponse' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+  /auth/logout:
+    post:
+      tags: [Identidad]
+      summary: Cerrar la sesión (revoca la renovación en el servidor y borra la cookie)
+      security: []
+      responses:
+        '204':
+          description: Sesión cerrada; nunca falla, aunque no haya cookie
+          headers:
+            Set-Cookie: { schema: { type: string } }
   /me:
     get:
       tags: [Identidad]

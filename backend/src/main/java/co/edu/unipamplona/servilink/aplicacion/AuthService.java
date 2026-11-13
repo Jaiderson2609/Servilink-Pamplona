@@ -21,7 +21,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class AuthService {
 
-    public record Sesion(String accessToken, long expiresIn, Long id, String rol, String nombre) {}
+    /** {@code renovacion} es el token de renovación nuevo; nulo si no hay que entregar otro (ventana de gracia). */
+    public record Sesion(String accessToken, long expiresIn, Long id, String rol, String nombre, String renovacion) {}
 
     private final UsuarioRepositorio usuarios;
     private final BilleteraRepositorio billeteras;
@@ -29,15 +30,17 @@ public class AuthService {
     private final JwtEncoder jwt;
     private final Configuracion config;
     private final Clock reloj;
+    private final RenovacionSesion renovaciones;
 
     public AuthService(UsuarioRepositorio usuarios, BilleteraRepositorio billeteras, PasswordEncoder codificador,
-                       JwtEncoder jwt, Configuracion config, Clock reloj) {
+                       JwtEncoder jwt, Configuracion config, Clock reloj, RenovacionSesion renovaciones) {
         this.usuarios = usuarios;
         this.billeteras = billeteras;
         this.codificador = codificador;
         this.jwt = jwt;
         this.config = config;
         this.reloj = reloj;
+        this.renovaciones = renovaciones;
     }
 
     @Transactional
@@ -63,12 +66,36 @@ public class AuthService {
         if (u.isSuspendido()) {
             throw new ErrorNegocio(Codigo.ACCOUNT_SUSPENDED, "Tu cuenta está suspendida; contacta al administrador");
         }
+        return emitir(u, renovaciones.abrir(u.getId()));
+    }
+
+    /** Cambia un token de renovación válido por un token de acceso nuevo (y otro token de renovación, rotado). */
+    @Transactional(noRollbackFor = ErrorNegocio.class) // la revocación por reutilización debe quedar guardada aunque se responda 401
+    public Sesion renovar(String tokenRenovacion) {
+        var r = renovaciones.renovar(tokenRenovacion);
+        Usuario u = usuarios.findById(r.usuarioId()).orElse(null);
+        if (u == null || u.isSuspendido()) {
+            renovaciones.revocarDe(r.usuarioId());
+            throw new ErrorNegocio(Codigo.UNAUTHENTICATED, "Tu sesión venció, ingresa de nuevo");
+        }
+        return emitir(u, r.tokenNuevo());
+    }
+
+    public void cerrarSesion(String tokenRenovacion) {
+        renovaciones.cerrar(tokenRenovacion);
+    }
+
+    public long vigenciaRenovacionSeg() {
+        return renovaciones.vigenciaSeg();
+    }
+
+    private Sesion emitir(Usuario u, String renovacion) {
         var ahora = reloj.instant();
         var claims = JwtClaimsSet.builder().subject(String.valueOf(u.getId())).claim("rol", u.getRol())
                 .issuedAt(ahora).expiresAt(ahora.plus(Duration.ofSeconds(config.tokenVigenciaSeg()))).build();
         String token = jwt.encode(JwtEncoderParameters.from(JwsHeader.with(MacAlgorithm.HS256).build(), claims))
                 .getTokenValue();
-        return new Sesion(token, config.tokenVigenciaSeg(), u.getId(), u.getRol(), u.getNombre());
+        return new Sesion(token, config.tokenVigenciaSeg(), u.getId(), u.getRol(), u.getNombre(), renovacion);
     }
 
     public record Perfil(Long id, String rol, String nombre, String correo, String telefono) {}

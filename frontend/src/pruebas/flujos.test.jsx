@@ -26,6 +26,7 @@ describe('ingreso', () => {
       'GET /service-requests/mine': [], 'GET /trades': [{ id: 2, nombre: 'Electricista' }],
     });
     pintar(<App />);
+    await screen.findByLabelText('Correo');
     await userEvent.type(screen.getByLabelText('Correo'), 'ana@correo.co');
     await userEvent.type(screen.getByLabelText('Clave'), 'clave-segura-1');
     await userEvent.click(screen.getByRole('button', { name: 'Ingresar', hidden: false, description: '' }).closest('form').querySelector('button[type=submit]'));
@@ -36,6 +37,7 @@ describe('ingreso', () => {
   it('muestra el error cuando la clave es incorrecta y no guarda sesión', async () => {
     simularApi({ 'POST /auth/login': [401, { code: 'UNAUTHENTICATED', message: 'Correo o clave incorrectos', traceId: 't' }] });
     pintar(<App />);
+    await screen.findByLabelText('Correo');
     await userEvent.type(screen.getByLabelText('Correo'), 'ana@correo.co');
     await userEvent.type(screen.getByLabelText('Clave'), 'mala-clave-123');
     await userEvent.click(document.querySelector('form button[type=submit]'));
@@ -50,6 +52,7 @@ describe('ingreso', () => {
       'GET /service-requests/open': [], 'GET /technicians/me/location': [404, { code: 'NOT_FOUND', message: 'x', traceId: 't' }],
     });
     pintar(<App />);
+    await screen.findByLabelText('Correo');
     await userEvent.click(screen.getByRole('tab', { name: 'Crear cuenta' }));
     await userEvent.selectOptions(screen.getByLabelText('Quiero'), 'TECNICO');
     await userEvent.type(screen.getByLabelText('Nombre'), 'Nuevo Tec');
@@ -195,6 +198,7 @@ describe('tiempo real', () => {
       'GET /service-requests/mine': [], 'GET /trades': [{ id: 2, nombre: 'Electricista' }],
     });
     pintar(<App />);
+    await screen.findByLabelText('Correo');
     expect(WebSocketFalso.instancias).toHaveLength(0); // sin sesión no hay canal
     await userEvent.type(screen.getByLabelText('Correo'), 'ana@correo.co');
     await userEvent.type(screen.getByLabelText('Clave'), 'clave-segura-1');

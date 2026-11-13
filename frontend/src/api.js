@@ -5,9 +5,12 @@ const BASE = (import.meta.env?.VITE_API_URL || '') + '/api/v1';
 
 let token = null;
 let alVencer = null;
+let alRenovar = null;
 
 export const setToken = (t) => { token = t; };
 export const alSesionVencida = (fn) => { alVencer = fn; };
+/** fn() renueva la sesión y devuelve true si lo logró; api() la usa una vez cuando el token de acceso venció. */
+export const alSesionRenovar = (fn) => { alRenovar = fn; };
 export { nuevaLlave };
 
 /** Mensajes en español según el código estable del servidor (DDS 10 y 11.1). */
@@ -36,7 +39,7 @@ export function traducir(error) {
  * Llama al API. Devuelve el JSON (o un Blob con `blob: true`). Si falla lanza {status, code, message, traceId}.
  * `llave` agrega Idempotency-Key: úsala en las operaciones que crean o mueven dinero o estado.
  */
-export async function api(ruta, { metodo = 'GET', json, form, blob, llave } = {}) {
+export async function api(ruta, { metodo = 'GET', json, form, blob, llave, reintentado = false } = {}) {
   const cab = {};
   if (token) cab.Authorization = 'Bearer ' + token;
   if (llave) cab['Idempotency-Key'] = llave;
@@ -54,7 +57,11 @@ export async function api(ruta, { metodo = 'GET', json, form, blob, llave } = {}
   let datos = null;
   if (txt) { try { datos = JSON.parse(txt); } catch { /* respuesta sin JSON */ } }
   if (!r.ok) {
-    if (r.status === 401 && token && datos?.code === 'UNAUTHENTICATED' && alVencer) alVencer();
+    if (r.status === 401 && token && datos?.code === 'UNAUTHENTICATED' && !ruta.startsWith('/auth/')) {
+      // El token de acceso dura poco: antes de dar la sesión por perdida se intenta renovarla una vez.
+      if (alRenovar && !reintentado && await alRenovar()) return api(ruta, { metodo, json, form, blob, llave, reintentado: true });
+      if (alVencer) alVencer();
+    }
     const e = { status: r.status, code: datos?.code || 'ERROR', message: datos?.message || 'Ocurrió un error inesperado', traceId: datos?.traceId };
     throw e;
   }
