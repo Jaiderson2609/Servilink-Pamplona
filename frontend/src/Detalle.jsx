@@ -4,6 +4,7 @@ import { useSesion } from './sesion.jsx';
 import { Cargando, Insignia, useUI } from './ui.jsx';
 import { ir, useAhora, useEventos, usePolling } from './hooks.js';
 import { RESPALDO_MS, eventosConectados } from './eventos.js';
+import Fotos from './Fotos.jsx';
 import { PASOS, cop, cuentaAtras, estrellasTexto, hora, metros } from './util.js';
 
 export default function Detalle({ id }) {
@@ -98,59 +99,6 @@ function Cuenta({ expiraEn }) {
   const ahora = useAhora(1000);
   const t = cuentaAtras(expiraEn, ahora);
   return <div><span className="pequeno suave">{t ? `Tiempo restante: ${t}` : 'El plazo terminó'}</span></div>;
-}
-
-function Fotos({ s, esHogar, recargar }) {
-  const { avisar, intentar } = useUI();
-  const [fotos, setFotos] = useState(null);
-  const [urls, setUrls] = useState({});
-  const [version, setVersion] = useState(0);
-
-  useEffect(() => {
-    let vivo = true;
-    const creadas = [];
-    (async () => {
-      let lista = [];
-      try { lista = await api(`/service-requests/${s.id}/photos`); } catch { /* sin permiso: no se muestra */ }
-      if (!vivo) return;
-      setFotos(lista);
-      for (const f of lista) {
-        api(`/service-requests/${s.id}/photos/${f.id}`, { blob: true }).then((b) => {
-          if (!vivo) return;
-          const u = URL.createObjectURL(b); creadas.push(u);
-          setUrls((x) => ({ ...x, [f.id]: u }));
-        }).catch(() => {});
-      }
-    })();
-    return () => { vivo = false; creadas.forEach((u) => URL.revokeObjectURL(u)); };
-  }, [s.id, version]);
-
-  if (fotos === null) return null;
-  const puede = esHogar && ['E01', 'E02', 'E03'].includes(s.estado) && fotos.length < 3;
-  if (!fotos.length && !puede) return null;
-
-  const subir = async (ev) => {
-    const f = ev.target.files[0];
-    if (!f) return;
-    if (f.size > 2 * 1024 * 1024) { avisar('Cada foto puede pesar hasta 2 MB', 'error'); ev.target.value = ''; return; }
-    const form = new FormData(); form.append('foto', f);
-    const r = await intentar(() => api(`/service-requests/${s.id}/photos`, { metodo: 'POST', form }));
-    ev.target.value = '';
-    if (r) { avisar('Foto agregada', 'ok'); setVersion((v) => v + 1); recargar(); }
-  };
-
-  return (
-    <div className="tarjeta">
-      <h3>Fotos</h3>
-      {fotos.length
-        ? <div className="fotos">{fotos.map((f) => <img key={f.id} className="foto" alt="Foto de la solicitud" loading="lazy" src={urls[f.id]} />)}</div>
-        : <p className="suave">Una foto ayuda a los técnicos a cotizar mejor.</p>}
-      {puede && (
-        <div className="campo"><label htmlFor="foto-nueva">Agregar foto ({fotos.length}/3, hasta 2 MB)</label>
-          <input id="foto-nueva" type="file" accept="image/jpeg,image/png,image/webp" onChange={subir} /></div>
-      )}
-    </div>
-  );
 }
 
 function Ofertas({ s, recargar }) {

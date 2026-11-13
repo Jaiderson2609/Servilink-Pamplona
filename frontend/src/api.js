@@ -24,6 +24,7 @@ const MENSAJES = {
   UNAUTHENTICATED: 'Tu sesión venció o los datos son incorrectos.',
   RATE_LIMITED: 'Hay muchas peticiones seguidas. Espera un poco e intenta de nuevo.',
   PAYMENT_UNAVAILABLE: 'Los pagos con Wompi no están disponibles por ahora. Intenta de nuevo más tarde.',
+  UPLOAD_UNAVAILABLE: 'La subida de fotos no está disponible por ahora. Intenta de nuevo más tarde.',
   GEOCODING_UNAVAILABLE: 'El buscador de direcciones no está disponible. Toca el mapa o escribe las coordenadas.',
 };
 
