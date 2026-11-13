@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { pintar, sesionComo, simularApi } from './apoyo.jsx';
-import Billetera, { referenciaDeRetorno } from '../Billetera.jsx';
+import Billetera, { referenciaDeRetorno, referenciaPendiente } from '../Billetera.jsx';
 import Tecnico from '../Tecnico.jsx';
 
 vi.mock('../Mapa.jsx', () => ({ default: () => <div data-testid="mapa" /> })); // Leaflet necesita un navegador real
@@ -15,8 +15,11 @@ const INICIADA = { referencia: 'SL-abc', valorCop: 50000, estado: 'PENDING', url
 
 const conRetorno = (referencia) => window.history.replaceState(null, '', referencia ? `/?recarga=${referencia}#/t/billetera` : '/#/t/billetera');
 
-beforeEach(() => { sesionComo({ id: 7, rol: 'TECNICO', nombre: 'Luis Gómez' }); irA.mockClear(); conRetorno(null); });
-afterEach(() => { vi.useRealTimers(); conRetorno(null); });
+const CLAVE = 'servilink-recarga-pendiente';
+const guardado = (referencia, hace = 0) => window.localStorage.setItem(CLAVE, JSON.stringify({ referencia, en: Date.now() - hace }));
+
+beforeEach(() => { window.localStorage.clear(); sesionComo({ id: 7, rol: 'TECNICO', nombre: 'Luis Gómez' }); irA.mockClear(); conRetorno(null); });
+afterEach(() => { vi.useRealTimers(); conRetorno(null); window.localStorage.clear(); });
 
 describe('recarga con Wompi', () => {
   it('"Pagar con Wompi" crea la recarga y lleva al técnico al pago, con Idempotency-Key', async () => {
@@ -28,6 +31,7 @@ describe('recarga con Wompi', () => {
     expect(crear.cuerpo).toEqual({ valorCop: 50000 });
     expect(crear.cab['Idempotency-Key']).toBeTruthy();
     expect(llamadas.some((l) => l.ruta === '/wallet/topups/demo')).toBe(false);
+    expect(referenciaPendiente()).toBe('SL-abc'); // por si Wompi no devuelve ?recarga=
   });
 
   it('si Wompi no está disponible muestra el error y no lleva a ninguna parte', async () => {
@@ -117,6 +121,48 @@ describe('regreso desde Wompi', () => {
     await screen.findByText('Recargar saldo');
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
     expect(llamadas.some((l) => l.ruta.startsWith('/wallet/topups/'))).toBe(false);
+  });
+});
+
+describe('regreso sin ?recarga= (referencia guardada antes de salir)', () => {
+  it('muestra cómo terminó el pago y olvida la referencia', async () => {
+    guardado('SL-abc');
+    simularApi({ 'GET /wallet': BASE, 'GET /wallet/topups/SL-abc': { referencia: 'SL-abc', valorCop: 50000, estado: 'FAILED' } });
+    pintar(<Billetera />);
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('no fue aprobado'));
+    expect(referenciaPendiente()).toBeNull();
+  });
+
+  it('si el pago sigue pendiente no muestra "confirmando": quizá nunca pagó', async () => {
+    guardado('SL-abc');
+    const llamadas = simularApi({ 'GET /wallet': BASE, 'GET /wallet/topups/SL-abc': { referencia: 'SL-abc', valorCop: 50000, estado: 'PENDING' } });
+    pintar(<Billetera />);
+    await screen.findByText('Recargar saldo');
+    await waitFor(() => expect(llamadas.some((l) => l.ruta === '/wallet/topups/SL-abc')).toBe(true));
+    expect(screen.queryByText(/confirmando tu pago/)).not.toBeInTheDocument();
+    expect(referenciaPendiente()).toBe('SL-abc');
+  });
+
+  it('una referencia vieja (más de 24 h) o con formato raro se ignora', async () => {
+    guardado('SL-abc', 25 * 60 * 60 * 1000);
+    expect(referenciaPendiente()).toBeNull();
+    guardado('../admin');
+    expect(referenciaPendiente()).toBeNull();
+    window.localStorage.setItem(CLAVE, 'no es json');
+    expect(referenciaPendiente()).toBeNull();
+    const llamadas = simularApi({ 'GET /wallet': BASE });
+    pintar(<Billetera />);
+    await screen.findByText('Recargar saldo');
+    expect(llamadas.some((l) => l.ruta.startsWith('/wallet/topups/'))).toBe(false);
+  });
+
+  it('el parámetro de la dirección manda sobre la referencia guardada', async () => {
+    guardado('SL-vieja');
+    conRetorno('SL-nueva');
+    const llamadas = simularApi({ 'GET /wallet': BASE, 'GET /wallet/topups/SL-nueva': { referencia: 'SL-nueva', valorCop: 50000, estado: 'APPROVED' } });
+    pintar(<Billetera />);
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Recarga acreditada'));
+    expect(llamadas.some((l) => l.ruta === '/wallet/topups/SL-vieja')).toBe(false);
   });
 });
 

@@ -10,7 +10,28 @@ const INTENTOS_MAX = 20; // un minuto: si Wompi no confirma antes, el saldo se a
 /** Referencia de la recarga a la que vuelve el técnico después de pagar en Wompi (…/?recarga=SL-…), o null. */
 export function referenciaDeRetorno() {
   const r = new URLSearchParams(window.location.search).get('recarga');
-  return r && /^[A-Za-z0-9_-]{1,40}$/.test(r) ? r : null;
+  return r && REF_VALIDA.test(r) ? r : null;
+}
+
+const REF_VALIDA = /^[A-Za-z0-9_-]{1,40}$/;
+const CLAVE_PENDIENTE = 'servilink-recarga-pendiente';
+const VIGENCIA_PENDIENTE_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * La referencia se guarda antes de salir a Wompi: si Wompi no devuelve el parámetro ?recarga= (o el técnico entra por
+ * su cuenta), igual se puede mostrar cómo terminó el pago. Es solo una pista del navegador: el servidor es quien manda.
+ */
+function guardarPendiente(referencia) {
+  try { window.localStorage.setItem(CLAVE_PENDIENTE, JSON.stringify({ referencia, en: Date.now() })); } catch { /* sin almacenamiento: queda el parámetro de la dirección */ }
+}
+function olvidarPendiente() {
+  try { window.localStorage.removeItem(CLAVE_PENDIENTE); } catch { /* nada que borrar */ }
+}
+export function referenciaPendiente() {
+  try {
+    const g = JSON.parse(window.localStorage.getItem(CLAVE_PENDIENTE) || 'null');
+    return g && REF_VALIDA.test(g.referencia || '') && Date.now() - g.en < VIGENCIA_PENDIENTE_MS ? g.referencia : null;
+  } catch { return null; }
 }
 
 const quitarRetornoDeLaDireccion = () => {
@@ -24,7 +45,7 @@ const MENSAJES = {
 };
 
 /** Consulta la recarga hasta que deja de estar pendiente: Wompi puede tardar unos segundos en avisar al servidor. */
-function ResultadoRecarga({ referencia, alTerminar }) {
+function ResultadoRecarga({ referencia, silenciosa, alTerminar }) {
   const [estado, setEstado] = useState('PENDING');
   const [agotado, setAgotado] = useState(false);
   useEffect(() => {
@@ -36,7 +57,7 @@ function ResultadoRecarga({ referencia, alTerminar }) {
         const r = await api(`/wallet/topups/${encodeURIComponent(referencia)}`);
         if (!vivo) return;
         setEstado(r.estado);
-        if (r.estado !== 'PENDING') { quitarRetornoDeLaDireccion(); alTerminar(r.estado); return; }
+        if (r.estado !== 'PENDING') { quitarRetornoDeLaDireccion(); olvidarPendiente(); alTerminar(r.estado); return; }
       } catch { /* un fallo de red no es el resultado del pago: se vuelve a intentar */ }
       intentos += 1;
       if (intentos >= INTENTOS_MAX) { if (vivo) setAgotado(true); return; }
@@ -46,6 +67,9 @@ function ResultadoRecarga({ referencia, alTerminar }) {
     return () => { vivo = false; clearTimeout(temporizador); };
   }, [referencia]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Si la referencia salió del almacenamiento (no de la dirección) y el pago sigue pendiente, quizá el técnico nunca
+  // pagó: no se le muestra un "confirmando" que no le corresponde.
+  if (silenciosa && !MENSAJES[estado]) return null;
   const [tipo, texto] = MENSAJES[estado] || ['info', agotado
     ? 'Wompi todavía no confirma tu pago. Cuando lo haga, tu saldo se actualizará solo; puedes volver a esta pantalla más tarde.'
     : 'Estamos confirmando tu pago con Wompi…'];
@@ -57,7 +81,8 @@ export default function Billetera() {
   const { datos, error, cargando, recargar } = usePolling(() => api('/wallet'), 20000, [], (e) => e.tipo === 'solicitud');
   const [valor, setValor] = useState(50000);
   const [enviando, setEnviando] = useState(false);
-  const [retorno] = useState(referenciaDeRetorno);
+  const [retorno] = useState(() => referenciaDeRetorno() || referenciaPendiente());
+  const [desdeDireccion] = useState(() => referenciaDeRetorno() !== null);
   const llaveDemo = useRef(nuevaLlave());
   const llavePago = useRef(nuevaLlave());
 
@@ -69,7 +94,7 @@ export default function Billetera() {
     setEnviando(true);
     const r = await intentar(() => api('/wallet/topups', { metodo: 'POST', json: { valorCop: Number(valor) }, llave: llavePago.current }));
     setEnviando(false);
-    if (r?.urlPago) { llavePago.current = nuevaLlave(); irA(r.urlPago); }
+    if (r?.urlPago) { llavePago.current = nuevaLlave(); guardarPendiente(r.referencia); irA(r.urlPago); }
   };
 
   const recargarDemo = async () => {
@@ -81,7 +106,7 @@ export default function Billetera() {
 
   return (
     <>
-      {retorno && <ResultadoRecarga referencia={retorno} alTerminar={() => recargar()} />}
+      {retorno && <ResultadoRecarga referencia={retorno} silenciosa={!desdeDireccion} alTerminar={() => recargar()} />}
       <div className="rejilla">
         <div className="tarjeta estadistica"><div className="suave">Saldo disponible</div><div className="dinero">{cop(datos.saldoDisponibleCop)}</div>
           <div className="pequeno suave">Necesitas al menos $ 40.000 para postularte</div></div>
