@@ -17,16 +17,18 @@ public class EjecucionService {
     private final NotificacionRepositorio avisos;
     private final SolicitudService consultas;
     private final Clock reloj;
+    private final PublicadorEventos eventos;
 
     public EjecucionService(SolicitudRepositorio solicitudes, BilleteraRepositorio billeteras,
                             MovimientoRepositorio libro, NotificacionRepositorio avisos, SolicitudService consultas,
-                            Clock reloj) {
+                            Clock reloj, PublicadorEventos eventos) {
         this.solicitudes = solicitudes;
         this.billeteras = billeteras;
         this.libro = libro;
         this.avisos = avisos;
         this.consultas = consultas;
         this.reloj = reloj;
+        this.eventos = eventos;
     }
 
     /** TR-04 (RF-029): solo el técnico asignado marca su llegada. */
@@ -39,6 +41,7 @@ public class EjecucionService {
         }
         s.setEstado(EstadoSolicitud.E04.codigo());
         Long aviso = aviso("LLEG-" + s.getId(), s.getHogarId(), "El técnico llegó a tu domicilio");
+        eventos.solicitud(s);
         return new Efecto<>(consultas.vista(s, tecnicoId, "TECNICO"), aviso);
     }
 
@@ -55,6 +58,7 @@ public class EjecucionService {
         }
         s.setTerminadoEn(reloj.instant());
         Long aviso = aviso("TERM-" + s.getId(), s.getHogarId(), "El técnico terminó el trabajo: confírmalo");
+        eventos.solicitud(s);
         return new Efecto<>(consultas.vista(s, tecnicoId, "TECNICO"), aviso);
     }
 
@@ -79,6 +83,7 @@ public class EjecucionService {
                 "COM-" + s.getId(), reloj.instant()));
         s.setEstado(EstadoSolicitud.E05.codigo());
         Long aviso = aviso("FIN-" + s.getId(), s.getTecnicoId(), "El hogar confirmó el trabajo. ¡Gracias!");
+        eventos.solicitud(s);
         return new Efecto<>(consultas.vista(s, hogarId, "HOGAR"), aviso);
     }
 
@@ -115,6 +120,7 @@ public class EjecucionService {
         s.setEstado(EstadoSolicitud.E07.codigo());
         s.setCanceladaPor(rol);
         s.setMotivoCancelacion(motivo == null || motivo.isBlank() ? null : motivo.trim());
+        eventos.solicitud(s);
         return new Efecto<>(consultas.vista(s, usuarioId, rol), avisoId);
     }
 
@@ -144,6 +150,7 @@ public class EjecucionService {
         s.setEstado(EstadoSolicitud.E07.codigo());
         s.setCanceladaPor("ADMIN");
         s.setMotivoCancelacion(motivo.trim());
+        eventos.solicitud(s);
         return new Efecto<>(s, avisoHogar);
     }
 
