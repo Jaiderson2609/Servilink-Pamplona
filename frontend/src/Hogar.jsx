@@ -12,7 +12,7 @@ export default function Hogar() {
   const { datos, error, cargando } = usePolling(async () => {
     const [mias, oficios] = await Promise.all([api('/service-requests/mine'), api('/trades')]);
     return { mias, oficios };
-  }, 15000, []);
+  }, 15000, [], (e) => e.tipo === 'solicitud');
 
   if (cargando) return <Cargando />;
   if (error || !datos) return <div className="vacio">No pudimos cargar tus solicitudes. {error?.message}</div>;
