@@ -39,3 +39,11 @@ Variables de entorno obligatorias: `JWT_SECRET` (mínimo 32 caracteres; sin ella
 
 Límites: la conexión se cierra cuando vence el token (el cliente reconecta con uno vigente), cada usuario mantiene como máximo 5 conexiones (se cierran las más viejas) y los mensajes del cliente no pueden pasar de 8 KB. El registro de conexiones vive en la memoria de la instancia: con varias instancias haría falta un bus compartido (por ejemplo LISTEN/NOTIFY de PostgreSQL). Si el socket se cae, el frontend sigue funcionando por consulta periódica.
 
+## Búsqueda de direcciones (Nominatim)
+`GET /api/v1/geocoding/search?q=` (usuario autenticado) convierte una dirección escrita en hasta 5 lugares con coordenadas. El servidor consulta Nominatim (OpenStreetMap) y cumple su política de uso: `User-Agent` que identifica la aplicación, una petición por segundo para todo el servidor, resultados en caché (24 h; 1 h si no hubo coincidencias) y búsqueda solo cuando el usuario toca "Buscar", sin autocompletado. Los resultados se sesgan hacia Pamplona, Cúcuta, Villa del Rosario y Los Patios sin excluir el resto de Colombia. Debe mostrarse la atribución "© colaboradores de OpenStreetMap".
+
+- Texto de 3 a 200 caracteres (`VALIDATION_ERROR` si no).
+- `RATE_LIMITED` (429) si hay más de 3 s de búsquedas en espera; `GEOCODING_UNAVAILABLE` (503) si Nominatim no responde. En ambos casos el usuario puede fijar el punto tocando el mapa o escribiendo las coordenadas.
+- Variables opcionales: `NOMINATIM_CONTACTO` (un correo o URL de contacto, que se añade al `User-Agent` como pide la política) y `NOMINATIM_URL` (para apuntar a otra instancia).
+- La caché y el turno por segundo viven en la memoria de la instancia: con varias instancias cada una respetaría el límite por separado y habría que compartirlos.
+

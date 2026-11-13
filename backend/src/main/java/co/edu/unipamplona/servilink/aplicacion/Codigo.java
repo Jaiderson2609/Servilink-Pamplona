@@ -30,6 +30,7 @@ public enum Codigo {
     DUPLICATE_RATING(HttpStatus.CONFLICT),
     PAYLOAD_TOO_LARGE(HttpStatus.PAYLOAD_TOO_LARGE),
     UNSUPPORTED_MEDIA_TYPE(HttpStatus.UNSUPPORTED_MEDIA_TYPE),
+    GEOCODING_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE),
     CONFLICT(HttpStatus.CONFLICT);
 
     private final HttpStatus estado;
