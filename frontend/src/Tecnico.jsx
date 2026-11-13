@@ -28,7 +28,7 @@ function Oportunidades() {
   const { datos, error, cargando } = usePolling(async () => {
     const [abiertas, zona] = await Promise.all([api('/service-requests/open'), api('/technicians/me/location').catch(() => null)]);
     return { abiertas, zona };
-  }, 8000, []);
+  }, 8000, [], (e) => e.tipo === 'abiertas' || e.tipo === 'solicitud');
   if (cargando) return <Cargando />;
   if (error || !datos) return <div className="vacio">No pudimos cargar las oportunidades. {error?.message}</div>;
   return (
@@ -42,7 +42,7 @@ function Oportunidades() {
 }
 
 function Servicios() {
-  const { datos, error, cargando } = usePolling(() => api('/service-requests/mine'), 15000, []);
+  const { datos, error, cargando } = usePolling(() => api('/service-requests/mine'), 15000, [], (e) => e.tipo === 'solicitud');
   if (cargando) return <Cargando />;
   if (error || !datos) return <div className="vacio">No pudimos cargar tus servicios. {error?.message}</div>;
   return <ListaSolicitudes lista={datos} vacio="Aún no tienes servicios. Postúlate a una solicitud abierta." />;
@@ -50,7 +50,7 @@ function Servicios() {
 
 function Billetera() {
   const { avisar, intentar } = useUI();
-  const { datos, error, cargando, recargar } = usePolling(() => api('/wallet'), 20000, []);
+  const { datos, error, cargando, recargar } = usePolling(() => api('/wallet'), 20000, [], (e) => e.tipo === 'solicitud');
   const [valor, setValor] = useState(50000);
   const llave = useRef(nuevaLlave());
 

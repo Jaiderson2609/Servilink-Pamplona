@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { api, alSesionVencida, setToken } from './api.js';
+import { detenerEventos, iniciarEventos } from './eventos.js';
 
 const Ctx = createContext(null);
 export const useSesion = () => useContext(Ctx);
@@ -34,6 +35,13 @@ export function SesionProvider({ children, alVencer }) {
   }, [alVencer]);
 
   useEffect(() => { alSesionVencida(() => salir('Tu sesión venció, ingresa de nuevo')); }, [salir]);
+
+  // El canal en tiempo real vive mientras haya sesión; sin él, las pantallas siguen consultando por intervalos.
+  const token = sesion?.token;
+  useEffect(() => {
+    if (token) iniciarEventos(token); else detenerEventos();
+    return detenerEventos;
+  }, [token]);
 
   const valor = useMemo(() => ({ yo: sesion?.yo ?? null, entrar, registrar, salir }), [sesion, entrar, registrar, salir]);
   return <Ctx.Provider value={valor}>{children}</Ctx.Provider>;

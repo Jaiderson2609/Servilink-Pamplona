@@ -7,6 +7,8 @@ import Detalle from '../Detalle.jsx';
 import Hogar from '../Hogar.jsx';
 import Admin from '../Admin.jsx';
 import { setToken } from '../api.js';
+import { WebSocketFalso } from './setup.js';
+import { act } from '@testing-library/react';
 
 vi.mock('../Mapa.jsx', () => ({ default: () => <div data-testid="mapa" /> })); // Leaflet necesita un navegador real
 
@@ -183,6 +185,52 @@ describe('detalle de la solicitud', () => {
     simularApi({ 'GET /service-requests/8': [403, { code: 'FORBIDDEN', message: 'No participas en esta solicitud', traceId: 't' }] });
     pintar(<Detalle id={8} />);
     expect(await screen.findByText(/no tienes acceso/)).toBeInTheDocument();
+  });
+});
+
+describe('tiempo real', () => {
+  it('al iniciar sesión abre el canal con el token y al salir lo cierra', async () => {
+    simularApi({
+      'POST /auth/login': { accessToken: 'tok-123', tokenType: 'Bearer', expiresIn: 900, usuarioId: 1, rol: 'HOGAR', nombre: 'Ana Pérez' },
+      'GET /service-requests/mine': [], 'GET /trades': [{ id: 2, nombre: 'Electricista' }],
+    });
+    pintar(<App />);
+    expect(WebSocketFalso.instancias).toHaveLength(0); // sin sesión no hay canal
+    await userEvent.type(screen.getByLabelText('Correo'), 'ana@correo.co');
+    await userEvent.type(screen.getByLabelText('Clave'), 'clave-segura-1');
+    await userEvent.click(screen.getByRole('button', { name: 'Ingresar', hidden: false, description: '' }).closest('form').querySelector('button[type=submit]'));
+    await screen.findByText('Hola, Ana');
+    expect(WebSocketFalso.instancias).toHaveLength(1);
+    const canal = WebSocketFalso.instancias[0];
+    act(() => canal.abrir());
+    expect(JSON.parse(canal.enviados[0])).toEqual({ tipo: 'auth', token: 'tok-123' });
+    await userEvent.click(screen.getByRole('button', { name: 'Salir' }));
+    expect(canal.readyState).toBe(3);
+  });
+
+  it('un aviso de chat trae el mensaje nuevo sin esperar al sondeo', async () => {
+    sesionComo(HOGAR);
+    let mensajes = [];
+    const llamadas = simularApi({
+      'GET /service-requests/9': { ...base, id: 9, estado: 'E03', tecnicoId: 2, contacto: { nombre: 'Tec Uno', telefono: '3001234567' } },
+      'GET /service-requests/9/photos': [],
+      'GET /service-requests/9/messages': () => mensajes,
+    });
+    pintar(<Detalle id={9} />);
+    await screen.findByText(/Cambiar un tomacorriente roto/);
+    // El canal lo abre SesionProvider al haber sesión.
+    await waitFor(() => expect(WebSocketFalso.instancias).toHaveLength(1));
+    const canal = WebSocketFalso.instancias[0];
+    act(() => { canal.abrir(); canal.recibir({ tipo: 'listo' }); });
+    const consultas = () => llamadas.filter((l) => l.ruta.startsWith('/service-requests/9/messages')).length;
+    const antes = consultas();
+    mensajes = [{ id: 1, autorId: 2, texto: 'Ya voy para allá', creadoEn: '2026-11-01T10:00:00Z', mio: false }];
+    act(() => canal.recibir({ tipo: 'chat', id: 9 }));
+    expect(await screen.findByText('Ya voy para allá')).toBeInTheDocument();
+    expect(consultas()).toBe(antes + 1);
+    act(() => canal.recibir({ tipo: 'chat', id: 55 })); // chat de otra solicitud: no consulta
+    await new Promise((r) => setTimeout(r, 100));
+    expect(consultas()).toBe(antes + 1);
   });
 });
 

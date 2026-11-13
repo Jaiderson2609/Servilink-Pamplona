@@ -2,12 +2,13 @@ import { useEffect, useRef, useState } from 'react';
 import { api, nuevaLlave } from './api.js';
 import { useSesion } from './sesion.jsx';
 import { Cargando, Insignia, useUI } from './ui.jsx';
-import { ir, useAhora, usePolling } from './hooks.js';
+import { ir, useAhora, useEventos, usePolling } from './hooks.js';
+import { RESPALDO_MS, eventosConectados } from './eventos.js';
 import { PASOS, cop, cuentaAtras, estrellasTexto, hora, metros } from './util.js';
 
 export default function Detalle({ id }) {
   const { yo } = useSesion();
-  const { datos: s, error, cargando, recargar } = usePolling(() => api('/service-requests/' + id), 6000, [id]);
+  const { datos: s, error, cargando, recargar } = usePolling(() => api('/service-requests/' + id), 6000, [id], (e) => e.tipo === 'solicitud' && e.id === id);
 
   return (
     <>
@@ -154,7 +155,7 @@ function Fotos({ s, esHogar, recargar }) {
 
 function Ofertas({ s, recargar }) {
   const { avisar, intentar } = useUI();
-  const { datos, cargando } = usePolling(() => api(`/service-requests/${s.id}/applications`), 6000, [s.id, s.estado]);
+  const { datos, cargando } = usePolling(() => api(`/service-requests/${s.id}/applications`), 6000, [s.id, s.estado], (e) => e.tipo === 'solicitud' && e.id === s.id);
   const llaves = useRef({});
   if (cargando) return <Cargando />;
   const activas = (datos || []).filter((o) => o.estado === 'ACTIVA');
@@ -215,7 +216,9 @@ function Chat({ s }) {
   const caja = useRef(null);
   const abierto = s.estado === 'E03' || s.estado === 'E04';
 
+  const ultimaTraida = useRef(0);
   const traer = async () => {
+    ultimaTraida.current = Date.now();
     try {
       const nuevos = await api(`/service-requests/${s.id}/messages?despues=${ultimo.current}`);
       if (nuevos.length) { ultimo.current = nuevos[nuevos.length - 1].id; setMensajes((m) => [...m, ...nuevos]); }
@@ -224,10 +227,12 @@ function Chat({ s }) {
   useEffect(() => {
     ultimo.current = 0; setMensajes([]);
     traer();
-    const t = setInterval(traer, 4000);
+    // El aviso del servidor trae los mensajes al instante; el sondeo queda de respaldo si el canal está caído.
+    const t = setInterval(() => { if (!eventosConectados() || Date.now() - ultimaTraida.current > RESPALDO_MS) traer(); }, 4000);
     return () => clearInterval(t);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [s.id]);
+  useEventos((e) => e.tipo === 'chat' && e.id === s.id, traer);
   useEffect(() => { if (caja.current) caja.current.scrollTop = caja.current.scrollHeight; }, [mensajes]);
 
   const enviar = async (ev) => {
