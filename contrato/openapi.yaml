@@ -1001,7 +1001,7 @@ components:
         timestamp: { type: integer, format: int64 }
         publicId: { type: string }
         allowedFormats: { type: string, example: 'jpg,png,webp' }
-        signature: { type: string, description: SHA-256 de allowed_formats, public_id y timestamp ordenados más el secreto }
+        signature: { type: string, description: 'SHA-256 de allowed_formats, public_id y timestamp ordenados, más el secreto' }
         uploadUrl: { type: string, format: uri }
     MensajeCrear:
       type: object
