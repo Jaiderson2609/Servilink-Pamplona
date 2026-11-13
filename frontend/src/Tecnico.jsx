@@ -1,17 +1,21 @@
-import { useRef, useState } from 'react';
-import { api, nuevaLlave } from './api.js';
+import { useEffect, useState } from 'react';
+import { api } from './api.js';
 import { useSesion } from './sesion.jsx';
 import { Cargando, Pestanas, useUI } from './ui.jsx';
 import { ir, usePolling } from './hooks.js';
-import { PAMPLONA, TIPOS_MOV, cop, fecha, metros, nombrePila } from './util.js';
+import { PAMPLONA, metros, nombrePila } from './util.js';
 import { ListaSolicitudes } from './Solicitudes.jsx';
 import Ubicacion from './Ubicacion.jsx';
+import Billetera, { referenciaDeRetorno } from './Billetera.jsx';
 
 const TABS = [['oportunidades', 'Oportunidades'], ['servicios', 'Mis servicios'], ['billetera', 'Billetera'], ['zona', 'Zona de trabajo']];
 
 export default function Tecnico({ tab }) {
   const { yo } = useSesion();
-  const activa = TABS.some(([k]) => k === tab) ? tab : 'oportunidades';
+  const retorno = referenciaDeRetorno();
+  // Wompi devuelve al técnico a la raíz del sitio con ?recarga=…: se lo lleva a la billetera a ver el resultado.
+  const activa = retorno ? 'billetera' : TABS.some(([k]) => k === tab) ? tab : 'oportunidades';
+  useEffect(() => { if (retorno && tab !== 'billetera') ir('#/t/billetera'); }, [retorno, tab]);
   return (
     <>
       <h1>Hola, {nombrePila(yo.nombre)}</h1>
@@ -46,53 +50,6 @@ function Servicios() {
   if (cargando) return <Cargando />;
   if (error || !datos) return <div className="vacio">No pudimos cargar tus servicios. {error?.message}</div>;
   return <ListaSolicitudes lista={datos} vacio="Aún no tienes servicios. Postúlate a una solicitud abierta." />;
-}
-
-function Billetera() {
-  const { avisar, intentar } = useUI();
-  const { datos, error, cargando, recargar } = usePolling(() => api('/wallet'), 20000, [], (e) => e.tipo === 'solicitud');
-  const [valor, setValor] = useState(50000);
-  const llave = useRef(nuevaLlave());
-
-  if (cargando) return <Cargando />;
-  if (error || !datos) return <div className="vacio">No pudimos cargar tu billetera. {error?.message}</div>;
-
-  const recargarSaldo = async (ev) => {
-    ev.preventDefault();
-    const r = await intentar(() => api('/wallet/topups', { metodo: 'POST', json: { valorCop: Number(valor) }, llave: llave.current }));
-    if (r) { llave.current = nuevaLlave(); avisar('Recarga acreditada', 'ok'); recargar(); }
-  };
-
-  return (
-    <>
-      <div className="rejilla">
-        <div className="tarjeta estadistica"><div className="suave">Saldo disponible</div><div className="dinero">{cop(datos.saldoDisponibleCop)}</div>
-          <div className="pequeno suave">Necesitas al menos $ 40.000 para postularte</div></div>
-        <div className="tarjeta estadistica"><div className="suave">Comisión retenida</div><div className="dinero">{cop(datos.saldoRetenidoCop)}</div>
-          <div className="pequeno suave">Se cobra al finalizar y se libera si cancelan</div></div>
-      </div>
-      <form className="tarjeta" onSubmit={recargarSaldo}>
-        <h3>Recargar saldo</h3>
-        <p className="pequeno suave">Recarga de demostración. En producción se reemplaza por el pago con Wompi.</p>
-        <div className="fila">
-          <div className="campo"><label htmlFor="rec-valor">Valor (COP)</label>
-            <input id="rec-valor" type="number" min={1000} step={1000} required value={valor} onChange={(e) => setValor(e.target.value)} /></div>
-          <button className="btn" type="submit">Recargar</button>
-        </div>
-      </form>
-      <div className="tarjeta">
-        <h3>Últimos movimientos</h3>
-        {datos.movimientos.length ? (
-          <div className="tabla-scroll"><table>
-            <thead><tr><th>Fecha</th><th>Movimiento</th><th>Valor</th><th>Saldo</th></tr></thead>
-            <tbody>{datos.movimientos.map((m) => (
-              <tr key={m.id}><td>{fecha(m.fecha)}</td><td>{TIPOS_MOV[m.tipo] || m.tipo}</td><td>{cop(m.valorCop)}</td><td>{cop(m.saldoPosteriorCop)}</td></tr>
-            ))}</tbody>
-          </table></div>
-        ) : <div className="vacio">Sin movimientos todavía.</div>}
-      </div>
-    </>
-  );
 }
 
 function Zona() {

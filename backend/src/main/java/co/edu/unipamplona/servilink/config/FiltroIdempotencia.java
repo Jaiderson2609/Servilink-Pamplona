@@ -34,7 +34,7 @@ public class FiltroIdempotencia extends OncePerRequestFilter {
     private static final Pattern FORMA = Pattern.compile("^[A-Za-z0-9_-]{8,80}$");
     private static final AntPathMatcher RUTAS = new AntPathMatcher();
     private static final Map<String, List<String>> MARCADAS = Map.of(
-            "POST", List.of("/api/v1/service-requests", "/api/v1/service-requests/*/applications", "/api/v1/wallet/topups"),
+            "POST", List.of("/api/v1/service-requests", "/api/v1/service-requests/*/applications", "/api/v1/wallet/topups", "/api/v1/wallet/topups/demo"),
             "PATCH", List.of("/api/v1/applications/*/select"));
 
     private final JdbcTemplate jdbc;

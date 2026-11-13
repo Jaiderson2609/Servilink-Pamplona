@@ -47,3 +47,34 @@ Límites: la conexión se cierra cuando vence el token (el cliente reconecta con
 - Variables opcionales: `NOMINATIM_CONTACTO` (un correo o URL de contacto, que se añade al `User-Agent` como pide la política) y `NOMINATIM_URL` (para apuntar a otra instancia).
 - La caché y el turno por segundo viven en la memoria de la instancia: con varias instancias cada una respetaría el límite por separado y habría que compartirlos.
 
+## Recargas con Wompi
+El técnico recarga su billetera pagando en el Web Checkout de Wompi (Nequi, PSE o tarjeta, en modo de pruebas hasta la entrega). Los datos de pago nunca pasan por este servidor.
+
+1. `POST /api/v1/wallet/topups` `{valorCop}` crea una recarga **PENDING** con una referencia única (`SL-…`) y devuelve `urlPago`: la dirección del checkout con el monto en centavos, la moneda `COP` y la firma de integridad (SHA-256 de `referencia + monto + moneda + secreto de integridad`). No mueve dinero. Máximo 5 intentos por técnico y hora (`RATE_LIMITED`).
+2. El cliente lleva al técnico a `urlPago`. Al terminar, Wompi lo devuelve a `URL_PUBLICA/?recarga=<referencia>` y la billetera consulta `GET /api/v1/wallet/topups/{referencia}` hasta que deja de estar pendiente.
+3. Wompi llama a `POST /api/v1/webhooks/wompi` (sin JWT). El servidor calcula el SHA-256 de los campos de `signature.properties` (tomados de `data`, en ese orden) + `timestamp` + secreto de eventos y lo compara con `signature.checksum` y con la cabecera `X-Event-Checksum`. Si no coincide: `401 INVALID_SIGNATURE`, saldo sin cambios y una línea de advertencia en el registro.
+4. Con firma válida, y bajo bloqueo de la fila de la recarga: `APPROVED` con el monto de la recarga y moneda `COP` inserta un asiento `RECARGA` (con la referencia como identificador del libro), suma al saldo y avisa al técnico, todo en una transacción. Repetir el evento, o recibirlo a la vez varias veces, deja un solo asiento y responde 200.
+
+| Estado | Significado |
+| --- | --- |
+| `PENDING` | Creada; falta el evento definitivo. |
+| `APPROVED` | Acreditada. Es definitiva: ningún evento posterior la revierte. |
+| `FAILED` | Rechazada, con error o anulada. No genera movimiento y puede aprobarse si el cliente reintenta el pago con la misma referencia. |
+| `REVIEW` | Pago aprobado cuyo monto, moneda o transacción no cuadran. No se acredita sola; queda para revisión manual. |
+
+Wompi no firma el campo `reference` del evento. Por eso una misma transacción de Wompi no puede acreditar dos recargas (índice único sobre `transaccion_wompi`) y el monto del evento se compara con el de la recarga.
+
+Variables de entorno (nunca en el repositorio; sin ellas `POST /wallet/topups` responde `503 PAYMENT_UNAVAILABLE` y todo evento se rechaza):
+
+| Variable | Valor |
+| --- | --- |
+| `WOMPI_LLAVE_PUBLICA` | Llave pública (`pub_test_…` en pruebas). |
+| `WOMPI_SECRETO_INTEGRIDAD` | Secreto de integridad (`test_integrity_…`). |
+| `WOMPI_SECRETO_EVENTOS` | Secreto de eventos (`test_events_…`). |
+| `URL_PUBLICA` | Dirección pública de la plataforma, a la que regresa el técnico (sin barra final). |
+| `WOMPI_CHECKOUT_URL` | Opcional; por defecto `https://checkout.wompi.co/p/`. |
+
+La llave privada de Wompi no se usa: el flujo no consulta su API. En el panel de Wompi, la URL de eventos del ambiente de pruebas es `<URL_PUBLICA>/api/v1/webhooks/wompi`.
+
+`POST /api/v1/wallet/topups/demo` (recarga de demostración, solo con `servilink.recarga-demo-habilitada=true`) sigue existiendo para desarrollo local; en producción debe estar desactivada.
+
