@@ -92,3 +92,15 @@ Sin credenciales, `uploads/signature` responde 503 `UPLOAD_UNAVAILABLE` y el cli
 Variables de entorno: `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`. Opcionales (solo para pruebas): `CLOUDINARY_UPLOAD_URL`, `CLOUDINARY_DELIVERY_URL`. Con Cloudinary configurado, la política de seguridad de contenido añade sus orígenes a `img-src` y `connect-src`; sin él, no.
 
 Limitaciones conocidas: el peso de 2 MB lo limita el navegador (Cloudinary admite hasta 10 MB en el plan gratuito) y las direcciones de las fotos son públicas pero no adivinables (identificador con UUID).
+
+## Renovación de sesión
+
+El token de acceso (JWT) dura 15 minutos. Para que la persona no tenga que iniciar sesión a cada rato, el servidor entrega además un **token de renovación** (DAD 11.1: «JWT de corta duración y renovación controlada»):
+
+- Viaja solo en una cookie `servilink_renovacion`: `HttpOnly` (el JavaScript de la página no la lee), `Secure`, `SameSite=Strict` y `Path=/api/v1/auth` (ninguna otra petición la lleva).
+- Es opaco y aleatorio (256 bits); en la base (`sesiones_renovacion`, migración V9) solo se guarda su SHA-256.
+- Es de **un solo uso con rotación**: `POST /api/v1/auth/refresh` lo gasta y entrega otro de la misma familia junto con un token de acceso nuevo. Si llega uno ya gastado fuera de una gracia de 10 segundos (dos pestañas renovando a la vez), se revoca toda la familia por posible robo.
+- Dura 7 días y una sesión no pasa de 30 días sin volver a iniciar. Las cuentas suspendidas no renuevan.
+- `POST /api/v1/auth/logout` revoca la familia y borra la cookie; cerrar sesión en un dispositivo no cierra la de otro.
+
+La página renueva sola un minuto antes de que venza el token, repite una vez la petición que reciba un 401 y, al abrirla sin sesión en la pestaña, intenta recuperarla con la cookie. Variables opcionales: `RENOVACION_VIGENCIA_SEG` (604800), `RENOVACION_MAXIMA_SEG` (2592000) y `COOKIE_SEGURA` (true; solo se apaga para probar sin HTTPS). La cookie exige que la página y la API compartan origen, como en el despliegue en Render.

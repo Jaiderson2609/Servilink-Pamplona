@@ -5,9 +5,10 @@ import Hogar from './Hogar.jsx';
 import Tecnico from './Tecnico.jsx';
 import Admin from './Admin.jsx';
 import Detalle from './Detalle.jsx';
+import { Cargando } from './ui.jsx';
 
 export default function App() {
-  const { yo, salir } = useSesion();
+  const { yo, restaurando, salir } = useSesion();
   const ruta = useRuta();
 
   return (
@@ -28,7 +29,7 @@ export default function App() {
         </div>
       </header>
       <main className="contenedor" id="vista">
-        {!yo ? <Auth /> : ruta.vista === 's' ? <Detalle id={ruta.id} />
+        {!yo ? (restaurando ? <Cargando /> : <Auth />) : ruta.vista === 's' ? <Detalle id={ruta.id} />
           : yo.rol === 'HOGAR' ? <Hogar />
           : yo.rol === 'TECNICO' ? <Tecnico tab={ruta.vista === 't' ? ruta.tab : null} />
           : <Admin tab={ruta.vista === 'a' ? ruta.tab : null} />}
