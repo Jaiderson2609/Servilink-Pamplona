@@ -15,4 +15,7 @@ public class ConfiguracionPruebas {
 
     @Bean @Primary
     NotificadorFalso notificadorDePruebas() { return new NotificadorFalso(); }
+
+    @Bean @Primary
+    GeocoderFalso geocoderDePruebas() { return new GeocoderFalso(); }
 }

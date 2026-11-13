@@ -64,6 +64,10 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 textarea { min-height: 96px; resize: vertical; }
 .campo { margin-bottom: .85rem; }
 .campo .ayuda { font-size: .8rem; color: var(--tinta-suave); margin-top: .25rem; }
+.buscar-direccion { display: flex; gap: .5rem; }
+.buscar-direccion input { flex: 1; min-width: 0; }
+.resultados-direccion { list-style: none; margin: .4rem 0 0; padding: 0; display: grid; gap: .4rem; }
+.resultados-direccion .btn { width: 100%; height: auto; text-align: left; white-space: normal; }
 .dos { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
 .chequeo { display: flex; gap: .55rem; align-items: flex-start; font-weight: 500; }
 .chequeo input { width: auto; margin-top: .3rem; }

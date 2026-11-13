@@ -19,6 +19,7 @@ tags:
   - name: Postulaciones
   - name: Ejecución
   - name: Técnico
+  - name: Ubicación
   - name: Billetera
   - name: Chat y calificación
   - name: Administración
@@ -429,6 +430,41 @@ paths:
         '401': { $ref: '#/components/responses/NoAutenticado' }
         '403': { $ref: '#/components/responses/SinPermiso' }
         '404': { $ref: '#/components/responses/NoEncontrado' }
+  /geocoding/search:
+    get:
+      tags: [Ubicación]
+      summary: Buscar una dirección y obtener sus coordenadas (Nominatim, a través del servidor)
+      description: >-
+        Solo debe invocarse cuando el usuario toca "Buscar"; no se usa para autocompletar mientras escribe.
+        El servidor guarda los resultados en caché y hace como máximo una petición por segundo a Nominatim.
+        Atribución obligatoria: © colaboradores de OpenStreetMap.
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: Dirección o lugar, de 3 a 200 caracteres
+          schema: { type: string, minLength: 3, maxLength: 200 }
+      responses:
+        '200':
+          description: Hasta 5 lugares encontrados; arreglo vacío si no hay coincidencias
+          content:
+            application/json:
+              schema:
+                type: array
+                maxItems: 5
+                items: { $ref: '#/components/schemas/LugarEncontrado' }
+        '400': { $ref: '#/components/responses/Invalida' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '429':
+          description: Demasiadas búsquedas en espera (RATE_LIMITED)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorApi' }
+        '503':
+          description: El proveedor de direcciones no responde (GEOCODING_UNAVAILABLE)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorApi' }
   /wallet:
     get:
       tags: [Billetera]
@@ -843,6 +879,13 @@ components:
         lat: { type: number, minimum: -90, maximum: 90 }
         lng: { type: number, minimum: -180, maximum: 180 }
         radioKm: { type: integer, minimum: 1, maximum: 50, default: 5 }
+    LugarEncontrado:
+      type: object
+      required: [nombre, lat, lng]
+      properties:
+        nombre: { type: string, example: 'Carrera 5, Centro, Pamplona, Norte de Santander, Colombia' }
+        lat: { type: number, example: 7.3772 }
+        lng: { type: number, example: -72.6473 }
     ZonaTrabajoResponse:
       type: object
       required: [lat, lng, radioKm]

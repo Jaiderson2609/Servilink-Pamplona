@@ -22,6 +22,8 @@ const MENSAJES = {
   ACCOUNT_SUSPENDED: 'Tu cuenta está suspendida. Contacta al administrador.',
   EMAIL_ALREADY_REGISTERED: 'Ya existe una cuenta con ese correo.',
   UNAUTHENTICATED: 'Tu sesión venció o los datos son incorrectos.',
+  RATE_LIMITED: 'Hay muchas búsquedas en este momento. Intenta de nuevo en unos segundos.',
+  GEOCODING_UNAVAILABLE: 'El buscador de direcciones no está disponible. Toca el mapa o escribe las coordenadas.',
 };
 
 export function traducir(error) {
