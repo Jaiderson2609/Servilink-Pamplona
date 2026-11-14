@@ -535,6 +535,114 @@ paths:
         '401': { $ref: '#/components/responses/NoAutenticado' }
         '403': { $ref: '#/components/responses/SinPermiso' }
         '404': { $ref: '#/components/responses/NoEncontrado' }
+  /service-requests/{solicitudId}/applications/mine:
+    get:
+      tags: [Postulaciones]
+      summary: Mi postulación a la solicitud, con el historial de ofertas (rol TECNICO)
+      parameters:
+        - { $ref: '#/components/parameters/SolicitudId' }
+      responses:
+        '200':
+          description: Postulación propia
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PostulacionResponse' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+  /applications/{postulacionId}/offers:
+    post:
+      tags: [Postulaciones]
+      summary: Contraoferta del hogar u oferta final del técnico (máximo 1 y 2 por postulación)
+      parameters:
+        - { $ref: '#/components/parameters/PostulacionId' }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OfertaCrear' }
+      responses:
+        '201':
+          description: Oferta registrada; la del técnico fija el precio vigente
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OfertaResponse' }
+        '400': { $ref: '#/components/responses/Invalida' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '409': { $ref: '#/components/responses/Conflicto' }
+        '410': { $ref: '#/components/responses/Expirada' }
+  /offers/{ofertaId}/accept:
+    patch:
+      tags: [Postulaciones]
+      summary: El técnico acepta la contraoferta del hogar; ese monto es el precio vigente
+      parameters:
+        - { name: ofertaId, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      responses:
+        '200':
+          description: Contraoferta aceptada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OfertaResponse' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '409': { $ref: '#/components/responses/Conflicto' }
+        '410': { $ref: '#/components/responses/Expirada' }
+  /applications/{postulacionId}/withdraw:
+    patch:
+      tags: [Postulaciones]
+      summary: El técnico retira su postulación mientras no haya sido elegido
+      parameters:
+        - { $ref: '#/components/parameters/PostulacionId' }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      responses:
+        '200':
+          description: Postulación retirada
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, estado]
+                properties:
+                  id: { type: integer, format: int64 }
+                  estado: { type: string, enum: [RETIRADA] }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '409': { $ref: '#/components/responses/Conflicto' }
+  /technicians/me/availability:
+    get:
+      tags: [Técnico]
+      summary: Disponibilidad actual del técnico
+      responses:
+        '200':
+          description: Disponibilidad vigente
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Disponibilidad' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+    patch:
+      tags: [Técnico]
+      summary: Cambiar la disponibilidad; solo un técnico AVAILABLE recibe solicitudes y puede postularse
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Disponibilidad' }
+      responses:
+        '200':
+          description: Disponibilidad actualizada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Disponibilidad' }
+        '400': { $ref: '#/components/responses/Invalida' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
   /geocoding/search:
     get:
       tags: [Ubicación]
@@ -996,9 +1104,33 @@ components:
         tecnico: { type: string }
         precioCop: { type: integer }
         mensaje: { type: string, nullable: true }
-        estado: { type: string, enum: [ACTIVA, ELEGIDA, DESCARTADA] }
+        estado: { type: string, enum: [ACTIVA, ELEGIDA, DESCARTADA, RETIRADA] }
         calificacionPromedio: { type: number, nullable: true }
         calificaciones: { type: integer }
+        ofertas:
+          type: array
+          description: Historial de propuestas de precio; precioCop es el precio vigente
+          items: { $ref: '#/components/schemas/OfertaResponse' }
+    OfertaCrear:
+      type: object
+      required: [montoCop]
+      properties:
+        montoCop: { type: integer, minimum: 1000, maximum: 5000000 }
+    OfertaResponse:
+      type: object
+      required: [id, autor, montoCop, secuencia, estado]
+      properties:
+        id: { type: integer, format: int64 }
+        autor: { type: string, enum: [TECNICO, HOGAR] }
+        montoCop: { type: integer }
+        secuencia: { type: integer, minimum: 1 }
+        estado: { type: string, enum: [PENDIENTE, ACEPTADA, RECHAZADA] }
+        creadaEn: { type: string, format: date-time }
+    Disponibilidad:
+      type: object
+      required: [estado]
+      properties:
+        estado: { type: string, enum: [AVAILABLE, BUSY, OFFLINE] }
     AsignacionResponse:
       type: object
       required: [solicitudId, estado, comisionRetenidaCop, contacto]

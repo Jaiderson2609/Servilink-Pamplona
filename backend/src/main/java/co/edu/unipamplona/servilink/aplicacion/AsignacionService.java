@@ -20,6 +20,7 @@ public class AsignacionService {
 
     private final SolicitudRepositorio solicitudes;
     private final PostulacionRepositorio postulaciones;
+    private final OfertaRepositorio ofertas;
     private final BilleteraRepositorio billeteras;
     private final MovimientoRepositorio libro;
     private final NotificacionRepositorio avisos;
@@ -29,11 +30,13 @@ public class AsignacionService {
     private final PublicadorEventos eventos;
 
     public AsignacionService(SolicitudRepositorio solicitudes, PostulacionRepositorio postulaciones,
+                             OfertaRepositorio ofertas,
                              BilleteraRepositorio billeteras, MovimientoRepositorio libro,
                              NotificacionRepositorio avisos, UsuarioRepositorio usuarios,
                              Configuracion config, Clock reloj, PublicadorEventos eventos) {
         this.solicitudes = solicitudes;
         this.postulaciones = postulaciones;
+        this.ofertas = ofertas;
         this.billeteras = billeteras;
         this.libro = libro;
         this.avisos = avisos;
@@ -71,6 +74,12 @@ public class AsignacionService {
         }
         if (!EstadoSolicitud.E02.es(sol.getEstado())) {
             throw new ErrorNegocio(Codigo.INVALID_STATE_TRANSITION, "La solicitud está en " + sol.getEstado());
+        }
+        if (!"ACTIVA".equals(pos.getEstado())) {
+            throw new ErrorNegocio(Codigo.INVALID_STATE_TRANSITION, "La postulación ya no está activa");
+        }
+        if (ofertas.existsByPostulacionIdAndAutorAndEstado(pos.getId(), Oferta.HOGAR, "PENDIENTE")) {
+            throw new ErrorNegocio(Codigo.INVALID_STATE_TRANSITION, "El técnico aún no responde tu contraoferta");
         }
         Instant ahora = reloj.instant();
         if (!ahora.isBefore(sol.getExpiraEn())) { // RN-02: el servidor decide con su propio reloj

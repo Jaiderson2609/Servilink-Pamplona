@@ -18,13 +18,32 @@ export default function Tecnico({ tab }) {
   useEffect(() => { if (retorno && tab !== 'billetera') ir('#/t/billetera'); }, [retorno, tab]);
   return (
     <>
-      <h1>Hola, {nombrePila(yo.nombre)}</h1>
+      <div className="fila entre"><h1>Hola, {nombrePila(yo.nombre)}</h1><Disponibilidad /></div>
       <Pestanas items={TABS} activa={activa} alCambiar={(k) => ir(`#/t/${k}`)} />
       {activa === 'oportunidades' && <Oportunidades />}
       {activa === 'servicios' && <Servicios />}
       {activa === 'billetera' && <Billetera />}
       {activa === 'zona' && <Zona />}
     </>
+  );
+}
+
+const ESTADOS = [['AVAILABLE', 'Disponible'], ['BUSY', 'Ocupado'], ['OFFLINE', 'Desconectado']];
+
+/** RF-019: solo un técnico disponible ve solicitudes y puede postularse. */
+function Disponibilidad() {
+  const { intentar, avisar } = useUI();
+  const { datos, recargar } = usePolling(() => api('/technicians/me/availability'), 0, []);
+  const cambiar = async (ev) => {
+    const r = await intentar(() => api('/technicians/me/availability', { metodo: 'PATCH', json: { estado: ev.target.value } }));
+    if (r) { avisar('Disponibilidad actualizada', 'ok'); recargar(); }
+  };
+  if (!datos) return null;
+  return (
+    <div className="campo"><label htmlFor="t-disp" className="pequeno suave">Mi disponibilidad</label>
+      <select id="t-disp" value={datos.estado} onChange={cambiar}>
+        {ESTADOS.map(([k, t]) => <option key={k} value={k}>{t}</option>)}
+      </select></div>
   );
 }
 

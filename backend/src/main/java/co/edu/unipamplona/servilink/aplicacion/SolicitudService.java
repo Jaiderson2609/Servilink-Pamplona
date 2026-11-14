@@ -23,11 +23,15 @@ public class SolicitudService {
                         Long hogarId, Long tecnicoId, String motivoCancelacion, Contacto contacto,
                         Integer distanciaM) {}
 
+    public record VistaOferta(Long id, String autor, Integer montoCop, int secuencia, String estado, Instant creadaEn) {}
+
     public record VistaPostulacion(Long id, Long tecnicoId, String tecnico, Integer precioCop, String mensaje,
-                                   String estado, Double calificacionPromedio, long calificaciones) {}
+                                   String estado, Double calificacionPromedio, long calificaciones,
+                                   List<VistaOferta> ofertas) {}
 
     private final SolicitudRepositorio solicitudes;
     private final PostulacionRepositorio postulaciones;
+    private final OfertaRepositorio ofertas;
     private final BilleteraRepositorio billeteras;
     private final OficioRepositorio oficios;
     private final UsuarioRepositorio usuarios;
@@ -38,11 +42,13 @@ public class SolicitudService {
     private final PublicadorEventos eventos;
 
     public SolicitudService(SolicitudRepositorio solicitudes, PostulacionRepositorio postulaciones,
+                            OfertaRepositorio ofertas,
                             BilleteraRepositorio billeteras, OficioRepositorio oficios, UsuarioRepositorio usuarios,
                             UbicacionTecnicoRepositorio ubicaciones, CalificacionRepositorio calificaciones,
                             Configuracion config, Clock reloj, PublicadorEventos eventos) {
         this.solicitudes = solicitudes;
         this.postulaciones = postulaciones;
+        this.ofertas = ofertas;
         this.billeteras = billeteras;
         this.oficios = oficios;
         this.usuarios = usuarios;
@@ -91,7 +97,11 @@ public class SolicitudService {
         if (solicitudes.existsByTecnicoIdAndEstadoIn(tecnicoId, EstadoSolicitud.codigos(EstadoSolicitud.E03, EstadoSolicitud.E04))) { // RN-07
             throw new ErrorNegocio(Codigo.TECHNICIAN_UNAVAILABLE, "Ya tienes un servicio activo");
         }
+        if (!"AVAILABLE".equals(usuarios.findById(tecnicoId).map(Usuario::getDisponibilidad).orElse("AVAILABLE"))) {
+            throw new ErrorNegocio(Codigo.TECHNICIAN_UNAVAILABLE, "Activa tu disponibilidad para postularte");
+        }
         Postulacion p = postulaciones.save(new Postulacion(solicitudId, tecnicoId, precio, mensaje, ahora));
+        ofertas.save(new Oferta(p.getId(), Oferta.TECNICO, precio, 1, ahora)); // la oferta inicial del técnico
         if (EstadoSolicitud.E01.es(s.getEstado())) {
             s.setEstado(EstadoSolicitud.E02.codigo());
             s.setExpiraEn(ahora.plus(Duration.ofMinutes(config.ventanaEleccionMin())));
@@ -107,7 +117,15 @@ public class SolicitudService {
         if (!s.getHogarId().equals(hogarId)) {
             throw new ErrorNegocio(Codigo.FORBIDDEN, "La solicitud es de otro hogar");
         }
-        return postulaciones.findBySolicitudId(solicitudId).stream().map(this::vistaPostulacion).toList();
+        return postulaciones.findBySolicitudId(solicitudId).stream()
+                .filter(p -> !"RETIRADA".equals(p.getEstado())).map(this::vistaPostulacion).toList();
+    }
+
+    /** El técnico consulta su propia postulación, con el historial de ofertas, para responder contraofertas. */
+    @Transactional(readOnly = true)
+    public VistaPostulacion miPostulacion(Long tecnicoId, Long solicitudId) {
+        return postulaciones.findBySolicitudIdAndTecnicoId(solicitudId, tecnicoId).map(this::vistaPostulacion)
+                .orElseThrow(() -> new ErrorNegocio(Codigo.NOT_FOUND, "No te has postulado a esta solicitud"));
     }
 
     @Transactional(readOnly = true)
@@ -133,6 +151,9 @@ public class SolicitudService {
     @Transactional(readOnly = true)
     public List<Vista> abiertas(Long tecnicoId) {
         Instant ahora = reloj.instant();
+        if (!"AVAILABLE".equals(usuarios.findById(tecnicoId).map(Usuario::getDisponibilidad).orElse("AVAILABLE"))) {
+            return List.of(); // RF-019: un técnico no disponible no recibe solicitudes
+        }
         if (ubicaciones.existsById(tecnicoId)) {
             // Con zona de trabajo definida: solo lo que cae dentro del radio, de la más cercana a la más lejana.
             var cercanas = solicitudes.cercanas(tecnicoId, ahora);
@@ -180,7 +201,9 @@ public class SolicitudService {
         long total = calificaciones.countByDestinatarioId(p.getTecnicoId());
         Double promedio = total == 0 ? null : Math.round(calificaciones.promedio(p.getTecnicoId()) * 100.0) / 100.0;
         return new VistaPostulacion(p.getId(), p.getTecnicoId(), nombre, p.getPrecio(), p.getMensaje(), p.getEstado(),
-                promedio, total);
+                promedio, total, ofertas.findByPostulacionIdOrderBySecuencia(p.getId()).stream()
+                        .map(o -> new VistaOferta(o.getId(), o.getAutor(), o.getMonto(), o.getSecuencia(), o.getEstado(), o.getCreadaEn()))
+                        .toList());
     }
 
     static ErrorNegocio noEncontrada() {

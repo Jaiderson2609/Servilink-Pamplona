@@ -27,7 +27,7 @@ public abstract class PruebaApi extends PruebaIntegracion {
 
     /** Las transiciones de estado usan PATCH (DDS 9); crear recursos usa POST. */
     protected static boolean esTransicion(String url) {
-        return url.matches(".*/(arrive|complete|confirm|cancel|select|status)$");
+        return url.matches(".*/(arrive|complete|confirm|cancel|select|status|withdraw|accept)$");
     }
 
     protected ResultActions enviar(String token, String url, String json, String claveIdempotencia) throws Exception {

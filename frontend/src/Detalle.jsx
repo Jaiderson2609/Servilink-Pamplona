@@ -5,6 +5,7 @@ import { Cargando, Insignia, useUI } from './ui.jsx';
 import { ir, useAhora, useEventos, usePolling } from './hooks.js';
 import { RESPALDO_MS, eventosConectados } from './eventos.js';
 import Fotos from './Fotos.jsx';
+import { OfertasHogar, PanelTecnico } from './Negociacion.jsx';
 import { PASOS, cop, cuentaAtras, estrellasTexto, hora, metros } from './util.js';
 
 export default function Detalle({ id }) {
@@ -74,8 +75,8 @@ function Contenido({ s, yo, recargar }) {
       </div>
 
       <Fotos s={s} esHogar={esHogar} recargar={recargar} />
-      {esHogar && activa && <Ofertas s={s} recargar={recargar} />}
-      {yo.rol === 'TECNICO' && !esTecnicoAsignado && activa && <FormPostular s={s} recargar={recargar} />}
+      {esHogar && activa && <OfertasHogar s={s} recargar={recargar} />}
+      {yo.rol === 'TECNICO' && !esTecnicoAsignado && activa && <PanelTecnico s={s} recargar={recargar} />}
 
       {hayAcciones && (
         <div className="tarjeta fila">
@@ -99,61 +100,6 @@ function Cuenta({ expiraEn }) {
   const ahora = useAhora(1000);
   const t = cuentaAtras(expiraEn, ahora);
   return <div><span className="pequeno suave">{t ? `Tiempo restante: ${t}` : 'El plazo terminó'}</span></div>;
-}
-
-function Ofertas({ s, recargar }) {
-  const { avisar, intentar } = useUI();
-  const { datos, cargando } = usePolling(() => api(`/service-requests/${s.id}/applications`), 6000, [s.id, s.estado], (e) => e.tipo === 'solicitud' && e.id === s.id);
-  const llaves = useRef({});
-  if (cargando) return <Cargando />;
-  const activas = (datos || []).filter((o) => o.estado === 'ACTIVA');
-
-  const elegir = async (o) => {
-    llaves.current[o.id] ??= nuevaLlave(); // un doble toque sobre "Elegir" usa la misma clave y no cobra dos veces
-    const r = await intentar(() => api(`/applications/${o.id}/select`, { metodo: 'PATCH', llave: llaves.current[o.id] }));
-    if (r) { avisar('Técnico asignado', 'ok'); recargar(); }
-  };
-
-  return (
-    <div className="tarjeta">
-      <h2>Ofertas ({activas.length})</h2>
-      {activas.length ? (
-        <ul className="lista-sol">{activas.map((o) => (
-          <li key={o.id} className="tarjeta">
-            <div className="fila entre"><strong>{o.tecnico}</strong><span className="dinero">{cop(o.precioCop)}</span></div>
-            <div className="pequeno suave">{estrellasTexto(o.calificacionPromedio, o.calificaciones)}</div>
-            {o.mensaje && <p>“{o.mensaje}”</p>}
-            <button className="btn" onClick={() => elegir(o)}>Elegir a este técnico</button>
-          </li>))}</ul>
-      ) : <div className="vacio">Todavía no hay ofertas. Esta página se actualiza sola.</div>}
-    </div>
-  );
-}
-
-function FormPostular({ s, recargar }) {
-  const { avisar, intentar } = useUI();
-  const [precio, setPrecio] = useState('');
-  const [mensaje, setMensaje] = useState('');
-  const llave = useRef(nuevaLlave());
-
-  const enviar = async (ev) => {
-    ev.preventDefault();
-    const r = await intentar(() => api(`/service-requests/${s.id}/applications`, {
-      metodo: 'POST', llave: llave.current, json: { precioCop: Number(precio), mensaje: mensaje.trim() || null } }));
-    if (r) { llave.current = nuevaLlave(); avisar('Tu oferta fue enviada', 'ok'); recargar(); }
-  };
-
-  return (
-    <form className="tarjeta" onSubmit={enviar}>
-      <h2>Enviar mi oferta</h2>
-      <div className="campo"><label htmlFor="p-precio">Tu precio (COP)</label>
-        <input id="p-precio" type="number" min={1000} max={5000000} step={500} required value={precio} onChange={(e) => setPrecio(e.target.value)} />
-        <div className="ayuda">Si te eligen se retiene el 10 % como comisión de tu saldo</div></div>
-      <div className="campo"><label htmlFor="p-msg">Mensaje (opcional)</label>
-        <textarea id="p-msg" maxLength={200} placeholder="Ej.: Llego en 20 minutos con las herramientas" value={mensaje} onChange={(e) => setMensaje(e.target.value)} /></div>
-      <button className="btn ancho" type="submit">Postularme</button>
-    </form>
-  );
 }
 
 function Chat({ s }) {
