@@ -97,7 +97,11 @@ public class SolicitudService {
         if (solicitudes.existsByTecnicoIdAndEstadoIn(tecnicoId, EstadoSolicitud.codigos(EstadoSolicitud.E03, EstadoSolicitud.E04))) { // RN-07
             throw new ErrorNegocio(Codigo.TECHNICIAN_UNAVAILABLE, "Ya tienes un servicio activo");
         }
-        if (!"AVAILABLE".equals(usuarios.findById(tecnicoId).map(Usuario::getDisponibilidad).orElse("AVAILABLE"))) {
+        Usuario tecnico = usuarios.findById(tecnicoId).orElseThrow(() -> new ErrorNegocio(Codigo.NOT_FOUND, "Usuario inexistente"));
+        if (!"APROBADA".equals(tecnico.getVerificacion())) { // RF-012: solo técnicos verificados se postulan
+            throw new ErrorNegocio(Codigo.TECHNICIAN_NOT_VERIFIED, "Tu identidad aún no está verificada");
+        }
+        if (!"AVAILABLE".equals(tecnico.getDisponibilidad())) {
             throw new ErrorNegocio(Codigo.TECHNICIAN_UNAVAILABLE, "Activa tu disponibilidad para postularte");
         }
         Postulacion p = postulaciones.save(new Postulacion(solicitudId, tecnicoId, precio, mensaje, ahora));
@@ -151,8 +155,9 @@ public class SolicitudService {
     @Transactional(readOnly = true)
     public List<Vista> abiertas(Long tecnicoId) {
         Instant ahora = reloj.instant();
-        if (!"AVAILABLE".equals(usuarios.findById(tecnicoId).map(Usuario::getDisponibilidad).orElse("AVAILABLE"))) {
-            return List.of(); // RF-019: un técnico no disponible no recibe solicitudes
+        var tecnico = usuarios.findById(tecnicoId).orElse(null);
+        if (tecnico == null || !"AVAILABLE".equals(tecnico.getDisponibilidad()) || !"APROBADA".equals(tecnico.getVerificacion())) {
+            return List.of(); // RF-012 y RF-019: solo un técnico verificado y disponible recibe solicitudes
         }
         if (ubicaciones.existsById(tecnicoId)) {
             // Con zona de trabajo definida: solo lo que cae dentro del radio, de la más cercana a la más lejana.

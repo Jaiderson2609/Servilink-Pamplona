@@ -116,3 +116,13 @@ El precio de una postulación se negocia con propuestas de precio, sin chat (RF-
 - `PATCH /applications/{id}/withdraw`: el técnico retira su postulación mientras no sea elegido (queda `RETIRADA` y no se puede elegir).
 - Toda negociación exige el servicio en E02 y la ventana vigente según el reloj del servidor.
 - `GET|PATCH /technicians/me/availability` (`AVAILABLE`, `BUSY`, `OFFLINE`): solo un técnico `AVAILABLE` ve solicitudes abiertas y puede postularse.
+
+## Verificación de técnicos
+
+Solo un técnico con la identidad verificada ve solicitudes abiertas y puede postularse (`TECHNICIAN_NOT_VERIFIED`, 403).
+
+- `POST /technicians/me/verification` (multipart: `cedulaFrente`, `cedulaReverso`, `selfie`; JPEG, PNG o WebP de hasta 2 MB; se valida el contenido real, no solo la extensión). El estado pasa a `PENDIENTE`; se puede reenviar mientras espera o si fue rechazado.
+- `GET /technicians/me/verification`: estado (`SIN_ENVIAR`, `PENDIENTE`, `APROBADA`, `RECHAZADA`) y motivo del rechazo.
+- `GET /admin/technicians?estado=`: técnicos por estado (por defecto, los pendientes). `GET /admin/technicians/{id}/documents/{tipo}`: imagen privada, sin caché.
+- `PATCH /admin/technicians/{id}/verification` (`APPROVED` o `REJECTED` con motivo): queda en la auditoría, avisa al técnico y **borra los documentos** (mínimo dato necesario, Ley 1581 de 2012).
+- Los documentos viven en la base de datos (tabla `documentos_verificacion`), nunca en Cloudinary ni con una URL pública. La migración V11 deja aprobados a los técnicos que ya existían.

@@ -18,6 +18,11 @@ public class Usuario {
     private String tokenPush;
 
     private String disponibilidad = "AVAILABLE";
+    private String verificacion = "SIN_ENVIAR";
+    @Column(name = "motivo_verificacion")
+    private String motivoVerificacion;
+    @Column(name = "verificacion_enviada_en")
+    private java.time.Instant verificacionEnviadaEn;
 
     private boolean suspendido;
     @Column(name = "motivo_suspension")
@@ -45,6 +50,21 @@ public class Usuario {
     public void setTokenPush(String tokenPush) { this.tokenPush = tokenPush; }
     public String getDisponibilidad() { return disponibilidad; }
     public void setDisponibilidad(String disponibilidad) { this.disponibilidad = disponibilidad; }
+    public String getVerificacion() { return verificacion; }
+    public String getMotivoVerificacion() { return motivoVerificacion; }
+    public java.time.Instant getVerificacionEnviadaEn() { return verificacionEnviadaEn; }
+
+    public void enviarVerificacion(java.time.Instant ahora) {
+        this.verificacion = "PENDIENTE";
+        this.motivoVerificacion = null;
+        this.verificacionEnviadaEn = ahora;
+    }
+
+    public void resolverVerificacion(boolean aprobada, String motivo) {
+        this.verificacion = aprobada ? "APROBADA" : "RECHAZADA";
+        this.motivoVerificacion = aprobada ? null : motivo;
+    }
+
     public boolean isSuspendido() { return suspendido; }
     public String getMotivoSuspension() { return motivoSuspension; }
 

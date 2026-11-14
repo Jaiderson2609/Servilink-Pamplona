@@ -59,8 +59,18 @@ public abstract class PruebaApi extends PruebaIntegracion {
         enviar(null, "/api/v1/auth/register", "{\"nombre\":\"Usuario " + correo + "\",\"correo\":\"" + correo
                 + "\",\"telefono\":\"3001234567\",\"clave\":\"clave-segura-1\",\"rol\":\"" + rol
                 + "\",\"aceptaTerminos\":true}").andReturn();
+        if ("TECNICO".equals(rol)) { // salvo en las pruebas de verificación, el técnico de prueba ya está verificado
+            jdbc.update("UPDATE usuarios SET verificacion = 'APROBADA' WHERE correo = ?", correo);
+        }
         return campo(enviar(null, "/api/v1/auth/login", "{\"correo\":\"" + correo + "\",\"clave\":\"clave-segura-1\"}"),
                 "$.accessToken");
+    }
+
+    /** Técnico recién registrado: sin verificar, como en producción. */
+    protected String cuentaSinVerificar(String correo) throws Exception {
+        String t = cuenta("TECNICO", correo);
+        jdbc.update("UPDATE usuarios SET verificacion = 'SIN_ENVIAR' WHERE correo = ?", correo);
+        return t;
     }
 
     protected long idDe(String token) throws Exception {

@@ -6,7 +6,7 @@ export const ESTADOS = {
 };
 export const PASOS = [['E01', 'Publicada'], ['E02', 'Ofertas'], ['E03', 'Asignado'], ['E04', 'En ejecución'], ['E05', 'Finalizado']];
 export const TIPOS_MOV = { RECARGA: 'Recarga', RETENCION: 'Comisión retenida', LIBERACION: 'Comisión liberada', COMISION: 'Comisión cobrada' };
-export const ACCIONES = { SUSPENDER_USUARIO: 'Suspendió una cuenta', REACTIVAR_USUARIO: 'Reactivó una cuenta', CANCELAR_SOLICITUD: 'Canceló una solicitud' };
+export const ACCIONES = { SUSPENDER_USUARIO: 'Suspendió una cuenta', REACTIVAR_USUARIO: 'Reactivó una cuenta', CANCELAR_SOLICITUD: 'Canceló una solicitud', APROBAR_TECNICO: 'Aprobó la verificación de un técnico', RECHAZAR_TECNICO: 'Rechazó la verificación de un técnico' };
 export const ACTIVAS = ['E01', 'E02', 'E03', 'E04'];
 
 export const cop = (n) => '$ ' + Number(n ?? 0).toLocaleString('es-CO');

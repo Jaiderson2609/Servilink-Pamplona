@@ -4,6 +4,7 @@ import co.edu.unipamplona.servilink.aplicacion.AdministracionService;
 import co.edu.unipamplona.servilink.aplicacion.Codigo;
 import co.edu.unipamplona.servilink.aplicacion.ErrorNegocio;
 import co.edu.unipamplona.servilink.aplicacion.NotificacionService;
+import co.edu.unipamplona.servilink.aplicacion.VerificacionService;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Map;
@@ -18,10 +19,40 @@ public class AdminController {
 
     private final AdministracionService admin;
     private final NotificacionService notificaciones;
+    private final VerificacionService verificacion;
 
-    public AdminController(AdministracionService admin, NotificacionService notificaciones) {
+    public AdminController(AdministracionService admin, NotificacionService notificaciones, VerificacionService verificacion) {
         this.admin = admin;
         this.notificaciones = notificaciones;
+        this.verificacion = verificacion;
+    }
+
+    /** Técnicos por estado de verificación (por defecto, los que esperan revisión). */
+    @GetMapping("/technicians")
+    public AdministracionService.Pagina<VerificacionService.Pendiente> tecnicos(
+            @RequestParam(required = false) String estado, @RequestParam(defaultValue = "0") int pagina,
+            @RequestParam(defaultValue = "20") int tamano) {
+        return verificacion.listar(estado, pagina, tamano);
+    }
+
+    /** Documento privado de un técnico en revisión: nunca se guarda en caché ni se interpreta como otro tipo. */
+    @GetMapping("/technicians/{tecnicoId}/documents/{tipo}")
+    public org.springframework.http.ResponseEntity<byte[]> documento(@PathVariable Long tecnicoId, @PathVariable String tipo) {
+        var d = verificacion.documento(tecnicoId, tipo);
+        return org.springframework.http.ResponseEntity.ok()
+                .contentType(org.springframework.http.MediaType.parseMediaType(d.tipoMime()))
+                .cacheControl(org.springframework.http.CacheControl.noStore()).header("X-Content-Type-Options", "nosniff")
+                .body(d.contenido());
+    }
+
+    @PatchMapping("/technicians/{tecnicoId}/verification")
+    public VerificacionService.Estado decidir(@PathVariable Long tecnicoId,
+            @Valid @RequestBody Peticiones.DecisionVerificacion d, @AuthenticationPrincipal Jwt jwt) {
+        var e = verificacion.decidir(id(jwt), tecnicoId, "APPROVED".equals(d.decision()), d.motivo());
+        if (e.avisoId() != null) {
+            notificaciones.despachar(e.avisoId()); // después del COMMIT, fuera de la transacción
+        }
+        return e.valor();
     }
 
     private static Long id(Jwt jwt) { return Long.valueOf(jwt.getSubject()); }

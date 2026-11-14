@@ -73,6 +73,7 @@ public abstract class PruebaIntegracion {
     protected long tecnico(String nombre, long saldo) {
         long id = usuario("TECNICO", nombre, "300" + (1000000 + (int) (Math.random() * 8999999)));
         jdbc.update("INSERT INTO billeteras (tecnico_id, disponible) VALUES (?, ?)", id, saldo);
+        jdbc.update("UPDATE usuarios SET verificacion = 'APROBADA' WHERE id = ?", id); // el técnico de prueba ya está verificado
         return id;
     }
 
