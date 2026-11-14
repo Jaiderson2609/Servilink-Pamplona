@@ -643,6 +643,44 @@ paths:
         '400': { $ref: '#/components/responses/Invalida' }
         '401': { $ref: '#/components/responses/NoAutenticado' }
         '403': { $ref: '#/components/responses/SinPermiso' }
+  /technicians/me/verification:
+    post:
+      tags: [Técnico]
+      summary: Enviar cédula (ambos lados) y selfie para verificar la identidad
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [cedulaFrente, cedulaReverso, selfie]
+              properties:
+                cedulaFrente: { type: string, format: binary, description: 'JPEG, PNG o WebP de hasta 2 MB' }
+                cedulaReverso: { type: string, format: binary }
+                selfie: { type: string, format: binary }
+      responses:
+        '200':
+          description: Documentos recibidos; la verificación queda en revisión
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EstadoVerificacion' }
+        '400': { $ref: '#/components/responses/Invalida' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '409': { $ref: '#/components/responses/Conflicto' }
+        '413': { description: 'Un documento supera los 2 MB' }
+        '415': { description: 'Solo se aceptan imágenes JPEG, PNG o WebP' }
+    get:
+      tags: [Técnico]
+      summary: Estado de mi verificación
+      responses:
+        '200':
+          description: Estado vigente y motivo del rechazo, si lo hubo
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EstadoVerificacion' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
   /geocoding/search:
     get:
       tags: [Ubicación]
@@ -802,6 +840,85 @@ paths:
               schema: { $ref: '#/components/schemas/ResumenAdmin' }
         '401': { $ref: '#/components/responses/NoAutenticado' }
         '403': { $ref: '#/components/responses/SinPermiso' }
+  /admin/technicians:
+    get:
+      tags: [Administración]
+      summary: Técnicos por estado de verificación (por defecto, los que esperan revisión)
+      parameters:
+        - { name: estado, in: query, schema: { type: string, enum: [SIN_ENVIAR, PENDIENTE, APROBADA, RECHAZADA] } }
+        - { name: pagina, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+        - { name: tamano, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+      responses:
+        '200':
+          description: Página de técnicos
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, pagina, tamano, total]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, nombre, correo, verificacion]
+                      properties:
+                        id: { type: integer, format: int64 }
+                        nombre: { type: string }
+                        correo: { type: string }
+                        verificacion: { type: string, enum: [SIN_ENVIAR, PENDIENTE, APROBADA, RECHAZADA] }
+                        enviadaEn: { type: string, format: date-time, nullable: true }
+                  pagina: { type: integer }
+                  tamano: { type: integer }
+                  total: { type: integer, format: int64 }
+        '400': { $ref: '#/components/responses/Invalida' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+  /admin/technicians/{tecnicoId}/documents/{tipo}:
+    get:
+      tags: [Administración]
+      summary: Documento privado de un técnico en revisión (sin caché)
+      parameters:
+        - { name: tecnicoId, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
+        - { name: tipo, in: path, required: true, schema: { type: string, enum: [CEDULA_FRENTE, CEDULA_REVERSO, SELFIE] } }
+      responses:
+        '200':
+          description: La imagen
+          content:
+            image/jpeg: { schema: { type: string, format: binary } }
+            image/png: { schema: { type: string, format: binary } }
+            image/webp: { schema: { type: string, format: binary } }
+        '400': { $ref: '#/components/responses/Invalida' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+  /admin/technicians/{tecnicoId}/verification:
+    patch:
+      tags: [Administración]
+      summary: Aprobar o rechazar la verificación; los documentos se borran y la decisión se audita
+      parameters:
+        - { name: tecnicoId, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision]
+              properties:
+                decision: { type: string, enum: [APPROVED, REJECTED] }
+                motivo: { type: string, maxLength: 200, description: Obligatorio (mínimo 5 caracteres) al rechazar }
+      responses:
+        '200':
+          description: Decisión registrada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EstadoVerificacion' }
+        '400': { $ref: '#/components/responses/Invalida' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '409': { $ref: '#/components/responses/Conflicto' }
   /admin/users:
     get:
       tags: [Administración]
@@ -1126,6 +1243,12 @@ components:
         secuencia: { type: integer, minimum: 1 }
         estado: { type: string, enum: [PENDIENTE, ACEPTADA, RECHAZADA] }
         creadaEn: { type: string, format: date-time }
+    EstadoVerificacion:
+      type: object
+      required: [estado]
+      properties:
+        estado: { type: string, enum: [SIN_ENVIAR, PENDIENTE, APROBADA, RECHAZADA] }
+        motivo: { type: string, nullable: true }
     Disponibilidad:
       type: object
       required: [estado]

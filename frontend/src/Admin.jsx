@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api } from './api.js';
 import { Cargando, Insignia, Pestanas, useUI } from './ui.jsx';
 import { ir, usePolling } from './hooks.js';
 import { ACCIONES, ACTIVAS, ESTADOS, cop, fecha, recortar } from './util.js';
 
-const TABS = [['resumen', 'Resumen'], ['usuarios', 'Usuarios'], ['solicitudes', 'Solicitudes'], ['auditoria', 'Auditoría']];
+const TABS = [['resumen', 'Resumen'], ['usuarios', 'Usuarios'], ['solicitudes', 'Solicitudes'], ['tecnicos', 'Verificación'], ['auditoria', 'Auditoría']];
 
 export default function Admin({ tab }) {
   const activa = TABS.some(([k]) => k === tab) ? tab : 'resumen';
@@ -15,6 +15,7 @@ export default function Admin({ tab }) {
       {activa === 'resumen' && <Resumen />}
       {activa === 'usuarios' && <Usuarios />}
       {activa === 'solicitudes' && <Solicitudes />}
+      {activa === 'tecnicos' && <Verificaciones />}
       {activa === 'auditoria' && <Auditoria />}
     </>
   );
@@ -166,5 +167,58 @@ function Auditoria() {
       </div>
       <Paginador pagina={pagina} total={r.total} tamano={TAM} ir={setPagina} />
     </>
+  );
+}
+
+const TIPOS_DOC = [['CEDULA_FRENTE', 'Cédula (frente)'], ['CEDULA_REVERSO', 'Cédula (reverso)'], ['SELFIE', 'Selfie con cédula']];
+
+/** Imágenes privadas: se piden con el token y se muestran desde la memoria del navegador, sin guardarlas. */
+function Documentos({ id }) {
+  const [urls, setUrls] = useState({});
+  useEffect(() => {
+    let vivo = true;
+    const creadas = [];
+    Promise.all(TIPOS_DOC.map(([t]) => api(`/admin/technicians/${id}/documents/${t}`, { blob: true }).then((b) => [t, URL.createObjectURL(b)]).catch(() => [t, null])))
+      .then((pares) => { pares.forEach(([, u]) => u && creadas.push(u)); if (vivo) setUrls(Object.fromEntries(pares)); });
+    return () => { vivo = false; creadas.forEach((u) => URL.revokeObjectURL(u)); };
+  }, [id]);
+  return (
+    <div className="fila">{TIPOS_DOC.map(([t, nombre]) => (
+      <figure key={t}>{urls[t] ? <img src={urls[t]} alt={nombre} style={{ maxWidth: '220px', maxHeight: '220px' }} /> : <div className="vacio">Cargando…</div>}<figcaption className="pequeno suave">{nombre}</figcaption></figure>
+    ))}</div>
+  );
+}
+
+function Verificaciones() {
+  const { avisar, intentar, pedir } = useUI();
+  const [abierto, setAbierto] = useState(null);
+  const { datos: r, error, cargando, recargar } = usePolling(() => api('/admin/technicians?estado=PENDIENTE&tamano=50'), 0, []);
+
+  const decidir = async (t, aprobar) => {
+    let motivo = null;
+    if (!aprobar) {
+      motivo = await pedir({ titulo: `Rechazar a ${t.nombre}`, texto: 'El técnico verá este motivo y podrá reenviar sus documentos.', etiqueta: 'Motivo', confirmar: 'Rechazar', peligro: true });
+      if (!motivo) return;
+    }
+    const ok = await intentar(() => api(`/admin/technicians/${t.id}/verification`, { metodo: 'PATCH', json: { decision: aprobar ? 'APPROVED' : 'REJECTED', motivo } }));
+    if (ok) { avisar(aprobar ? 'Técnico aprobado' : 'Verificación rechazada', 'ok'); setAbierto(null); recargar(); }
+  };
+
+  if (cargando) return <Cargando />;
+  if (error || !r) return <div className="vacio">No pudimos cargar las verificaciones. {error?.message}</div>;
+  return (
+    <div className="pila">
+      <h2>Técnicos por verificar ({r.total})</h2>
+      {r.items.length ? r.items.map((t) => (
+        <div className="tarjeta" key={t.id}>
+          <div className="fila entre"><strong>{t.nombre}</strong><span className="pequeno suave">{t.correo} · enviado {fecha(t.enviadaEn)}</span></div>
+          {abierto === t.id ? <Documentos id={t.id} /> : null}
+          <div className="fila">
+            <button className="btn sec chico" onClick={() => setAbierto(abierto === t.id ? null : t.id)}>{abierto === t.id ? 'Ocultar documentos' : 'Ver documentos'}</button>
+            <button className="btn chico" onClick={() => decidir(t, true)}>Aprobar</button>
+            <button className="btn peligro chico" onClick={() => decidir(t, false)}>Rechazar</button>
+          </div>
+        </div>)) : <div className="vacio">No hay técnicos esperando verificación.</div>}
+    </div>
   );
 }

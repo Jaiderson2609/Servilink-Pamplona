@@ -19,6 +19,8 @@ public interface UsuarioRepositorio extends JpaRepository<Usuario, Long> {
     @Query("select u from Usuario u where u.rol in :roles and (lower(u.nombre) like :patron or lower(u.correo) like :patron)")
     Page<Usuario> buscar(Collection<String> roles, String patron, Pageable pagina);
 
+    org.springframework.data.domain.Page<Usuario> findByRolAndVerificacion(String rol, String verificacion, Pageable pagina);
+
     long countByRol(String rol);
 
     long countBySuspendidoTrue();

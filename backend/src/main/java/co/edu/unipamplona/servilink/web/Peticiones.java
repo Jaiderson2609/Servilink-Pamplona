@@ -68,6 +68,10 @@ public final class Peticiones {
             @NotNull(message = "status es obligatorio") @Pattern(regexp = "ACTIVE|SUSPENDED", message = "status debe ser ACTIVE o SUSPENDED") String status,
             String reason) {}
 
+    public record DecisionVerificacion(
+            @NotNull(message = "decision es obligatoria") @Pattern(regexp = "APPROVED|REJECTED", message = "decision debe ser APPROVED o REJECTED") String decision,
+            @Size(max = 200, message = "motivo admite hasta 200 caracteres") String motivo) {}
+
     public record MotivoAdmin(
             @NotBlank(message = "el motivo es obligatorio") @Size(min = 5, max = 200, message = "el motivo debe tener entre 5 y 200 caracteres") String motivo) {}
 }
