@@ -34,6 +34,7 @@ public class Postulacion {
     public Long getTecnicoId() { return tecnicoId; }
     public Integer getPrecio() { return precio; }
     public String getMensaje() { return mensaje; }
+    public void setPrecio(Integer precio) { this.precio = precio; }
     public String getEstado() { return estado; }
     public void setEstado(String estado) { this.estado = estado; }
 }

@@ -32,6 +32,12 @@ public final class Peticiones {
             @NotNull(message = "precioCop es obligatorio") @Min(value = 1000, message = "precioCop debe ser al menos 1000") @Max(value = 5_000_000, message = "precioCop excede el máximo") Integer precioCop,
             @Size(max = 200, message = "mensaje admite hasta 200 caracteres") String mensaje) {}
 
+    public record OfertaCrear(
+            @NotNull(message = "montoCop es obligatorio") @Min(value = 1000, message = "montoCop debe ser al menos 1000") @Max(value = 5_000_000, message = "montoCop excede el máximo") Integer montoCop) {}
+
+    public record Disponibilidad(
+            @NotNull(message = "estado es obligatorio") @Pattern(regexp = "AVAILABLE|BUSY|OFFLINE", message = "estado debe ser AVAILABLE, BUSY u OFFLINE") String estado) {}
+
     public record Cancelacion(@Size(max = 200, message = "motivo admite hasta 200 caracteres") String motivo) {}
 
     public record Recarga(

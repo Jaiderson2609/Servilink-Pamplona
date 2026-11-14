@@ -104,3 +104,15 @@ El token de acceso (JWT) dura 15 minutos. Para que la persona no tenga que inici
 - `POST /api/v1/auth/logout` revoca la familia y borra la cookie; cerrar sesión en un dispositivo no cierra la de otro.
 
 La página renueva sola un minuto antes de que venza el token, repite una vez la petición que reciba un 401 y, al abrirla sin sesión en la pestaña, intenta recuperarla con la cookie. Variables opcionales: `RENOVACION_VIGENCIA_SEG` (604800), `RENOVACION_MAXIMA_SEG` (2592000) y `COOKIE_SEGURA` (true; solo se apaga para probar sin HTTPS). La cookie exige que la página y la API compartan origen, como en el despliegue en Render.
+
+## Negociación de precio y disponibilidad
+
+El precio de una postulación se negocia con propuestas de precio, sin chat (RF-023). Cada postulación guarda su historial en la tabla `ofertas` y `postulaciones.precio` es el precio vigente.
+
+- El técnico hace hasta 2 ofertas (la inicial al postularse y una final) y el hogar 1 contraoferta. Una oferta de más devuelve `NEGOTIATION_LIMIT_REACHED` (409).
+- `POST /applications/{id}/offers`: contraoferta del hogar u oferta final del técnico (solo como respuesta a una contraoferta pendiente). La oferta final reemplaza la contraoferta y fija el precio vigente.
+- `PATCH /offers/{id}/accept`: el técnico acepta la contraoferta; ese monto pasa a ser el precio vigente.
+- Mientras hay una contraoferta sin responder, el hogar no puede elegir a ese técnico. La comisión se calcula sobre el precio vigente al elegir.
+- `PATCH /applications/{id}/withdraw`: el técnico retira su postulación mientras no sea elegido (queda `RETIRADA` y no se puede elegir).
+- Toda negociación exige el servicio en E02 y la ventana vigente según el reloj del servidor.
+- `GET|PATCH /technicians/me/availability` (`AVAILABLE`, `BUSY`, `OFFLINE`): solo un técnico `AVAILABLE` ve solicitudes abiertas y puede postularse.

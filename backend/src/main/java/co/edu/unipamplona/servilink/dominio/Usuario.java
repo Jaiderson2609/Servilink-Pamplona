@@ -17,6 +17,8 @@ public class Usuario {
     @Column(name = "token_push")
     private String tokenPush;
 
+    private String disponibilidad = "AVAILABLE";
+
     private boolean suspendido;
     @Column(name = "motivo_suspension")
     private String motivoSuspension;
@@ -41,6 +43,8 @@ public class Usuario {
     public String getPasswordHash() { return passwordHash; }
     public String getTokenPush() { return tokenPush; }
     public void setTokenPush(String tokenPush) { this.tokenPush = tokenPush; }
+    public String getDisponibilidad() { return disponibilidad; }
+    public void setDisponibilidad(String disponibilidad) { this.disponibilidad = disponibilidad; }
     public boolean isSuspendido() { return suspendido; }
     public String getMotivoSuspension() { return motivoSuspension; }
 
