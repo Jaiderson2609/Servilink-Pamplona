@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # ---------- Etapa 1: constructor (instala las dependencias) ----------
-FROM python:3.13-slim AS builder
+FROM python:3.15-slim AS builder
 
 ENV PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
@@ -14,7 +14,7 @@ COPY requirements-prod.txt .
 RUN pip install --prefix=/install -r requirements-prod.txt
 
 # ---------- Etapa 2: imagen final (solo lo necesario para ejecutar) ----------
-FROM python:3.13-slim AS runtime
+FROM python:3.15-slim AS runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
