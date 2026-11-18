@@ -141,3 +141,12 @@ Solo un técnico con la identidad verificada ve solicitudes abiertas y puede pos
 | `SEARCH_RADIUS_M` | 5000 m | 1000 a 50000 | Radio por defecto de la zona de trabajo del técnico |
 
 `LOCATION_TTL_S` (vigencia de la ubicación) no está implementado: la zona del técnico es un punto base fijo y no una ubicación en vivo.
+
+## Ingreso con Google
+
+El botón "Continuar con Google" usa Google Identity Services. El navegador obtiene un ID token y lo envía a `POST /api/v1/auth/google`; el servidor lo verifica con las llaves públicas de Google (firma, emisor, audiencia = nuestro ID de cliente, vigencia y correo verificado) y abre la misma sesión de siempre (JWT de 15 min y cookie de renovación). No se usa el secreto de cliente.
+
+- Si el correo ya tiene cuenta (creada con clave o con Google), entra a esa cuenta; las cuentas suspendidas no entran.
+- Si no la tiene, responde `422 GOOGLE_REGISTRATION_REQUIRED`; la pantalla pide rol (hogar o técnico), teléfono y aceptación de términos, y reenvía la misma credencial. La cuenta nace con una clave aleatoria que nadie conoce.
+- Variable de entorno: `GOOGLE_CLIENT_ID` (público, termina en `.apps.googleusercontent.com`). Sin ella, `GET /auth/google/config` devuelve `clientId` vacío, el botón no se muestra y la política de seguridad de contenido no abre nada de Google. Con ella, se permiten `accounts.google.com/gsi/` en `script-src`, `style-src`, `frame-src` y `connect-src`.
+- En Google Cloud, el origen autorizado de JavaScript es la URL pública de la plataforma.

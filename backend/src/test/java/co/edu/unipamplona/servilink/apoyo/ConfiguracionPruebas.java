@@ -2,6 +2,7 @@ package co.edu.unipamplona.servilink.apoyo;
 
 import java.time.Clock;
 import java.time.Instant;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
@@ -18,4 +19,9 @@ public class ConfiguracionPruebas {
 
     @Bean @Primary
     GeocoderFalso geocoderDePruebas() { return new GeocoderFalso(); }
+
+    @Bean @Primary
+    VerificadorGoogleFalso googleDePruebas(@Value("${servilink.google-client-id:}") String clienteId) {
+        return new VerificadorGoogleFalso(clienteId);
+    }
 }

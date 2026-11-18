@@ -61,6 +61,69 @@ paths:
         '400': { $ref: '#/components/responses/Invalida' }
         '401': { $ref: '#/components/responses/NoAutenticado' }
         '403': { $ref: '#/components/responses/SinPermiso' }
+  /auth/google/config:
+    get:
+      tags: [Identidad]
+      summary: ID de cliente público de Google para dibujar el botón de ingreso
+      description: Devuelve `clientId` vacío si el ingreso con Google no está configurado (variable GOOGLE_CLIENT_ID).
+      security: []
+      responses:
+        '200':
+          description: Configuración pública
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [clientId]
+                properties:
+                  clientId: { type: string }
+  /auth/google:
+    post:
+      tags: [Identidad]
+      summary: Ingresar o crear la cuenta con Google
+      description: >-
+        Recibe el ID token que entrega Google Identity Services y lo verifica en el servidor (firma, emisor,
+        audiencia, vigencia y correo verificado). Si el correo ya tiene cuenta, abre su sesión. Si no, crea la cuenta
+        con `rol`, `telefono` y `aceptaTerminos`; mientras falten responde 422 GOOGLE_REGISTRATION_REQUIRED para que
+        la pantalla los pida y reenvíe la misma credencial. La sesión es la de siempre (JWT y cookie de renovación).
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [credencial]
+              properties:
+                credencial: { type: string, maxLength: 4096 }
+                rol: { type: string, enum: [HOGAR, TECNICO] }
+                telefono: { type: string, pattern: '^[0-9 +]{7,20}$' }
+                aceptaTerminos: { type: boolean }
+      responses:
+        '200':
+          description: Sesión abierta
+          headers:
+            Set-Cookie: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TokenResponse' }
+        '400': { $ref: '#/components/responses/Invalida' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403':
+          description: Cuenta suspendida (ACCOUNT_SUSPENDED)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorApi' }
+        '422':
+          description: Cuenta nueva sin rol, teléfono o términos (GOOGLE_REGISTRATION_REQUIRED)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorApi' }
+        '503':
+          description: El ingreso con Google no está configurado (GOOGLE_UNAVAILABLE)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorApi' }
   /auth/refresh:
     post:
       tags: [Identidad]

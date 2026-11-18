@@ -36,6 +36,12 @@ export function SesionProvider({ children, alVencer }) {
     guardar(deRespuesta(r));
   }, []);
 
+  /** Ingreso con Google: `datos` lleva la credencial y, si la cuenta es nueva, rol, teléfono y aceptaTerminos. */
+  const entrarConGoogle = useCallback(async (datos) => {
+    const r = await api('/auth/google', { metodo: 'POST', json: datos });
+    guardar(deRespuesta(r));
+  }, []);
+
   const registrar = useCallback(async (datos) => {
     await api('/auth/register', { metodo: 'POST', json: datos });
     await entrar(datos.correo, datos.clave);
@@ -83,7 +89,7 @@ export function SesionProvider({ children, alVencer }) {
     return detenerEventos;
   }, [token]);
 
-  const valor = useMemo(() => ({ yo: sesion?.yo ?? null, restaurando, entrar, registrar, salir }),
-    [sesion, restaurando, entrar, registrar, salir]);
+  const valor = useMemo(() => ({ yo: sesion?.yo ?? null, restaurando, entrar, entrarConGoogle, registrar, salir }),
+    [sesion, restaurando, entrar, entrarConGoogle, registrar, salir]);
   return <Ctx.Provider value={valor}>{children}</Ctx.Provider>;
 }

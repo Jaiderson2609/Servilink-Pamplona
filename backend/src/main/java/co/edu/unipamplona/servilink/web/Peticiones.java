@@ -15,6 +15,13 @@ public final class Peticiones {
             @NotNull(message = "rol es obligatorio") @Pattern(regexp = "HOGAR|TECNICO", message = "rol debe ser HOGAR o TECNICO") String rol,
             @AssertTrue(message = "debes aceptar la política de datos y los términos") boolean aceptaTerminos) {}
 
+    /** Ingreso con Google: la credencial es el ID token; rol, teléfono y términos solo se exigen si la cuenta es nueva. */
+    public record Google(
+            @NotBlank(message = "credencial es obligatoria") @Size(max = 4096) String credencial,
+            @Pattern(regexp = "HOGAR|TECNICO", message = "rol debe ser HOGAR o TECNICO") String rol,
+            @Pattern(regexp = "^[0-9 +]{7,20}$", message = "telefono no es válido") String telefono,
+            Boolean aceptaTerminos) {}
+
     public record Login(
             @NotBlank(message = "correo es obligatorio") String correo,
             @NotBlank(message = "clave es obligatoria") String clave) {}

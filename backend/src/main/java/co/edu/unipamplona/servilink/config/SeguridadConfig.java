@@ -53,10 +53,16 @@ public class SeguridadConfig {
 
     @Bean
     SecurityFilterChain cadena(HttpSecurity http, org.springframework.jdbc.core.JdbcTemplate jdbc, java.time.Clock reloj,
-            co.edu.unipamplona.servilink.aplicacion.AlmacenImagenes almacen) throws Exception {
+            co.edu.unipamplona.servilink.aplicacion.AlmacenImagenes almacen,
+            co.edu.unipamplona.servilink.aplicacion.VerificadorGoogle google) throws Exception {
         // Si Cloudinary está configurado, el navegador puede mostrar sus imágenes y subirles directamente.
         String imagenes = almacen.disponible() ? " " + almacen.origenEntrega() : "";
-        String conexiones = almacen.disponible() ? " " + almacen.origenSubida() : "";
+        boolean g = google.disponible();
+        String conexiones = (almacen.disponible() ? " " + almacen.origenSubida() : "") + (g ? " https://accounts.google.com/gsi/" : "");
+        // El botón de Google Identity Services carga su script, su estilo y su marco desde accounts.google.com.
+        String scripts = g ? " https://accounts.google.com/gsi/client" : "";
+        String estilos = g ? " https://accounts.google.com/gsi/style" : "";
+        String marcos = g ? "frame-src https://accounts.google.com/gsi/; " : "";
         var autoridades = new JwtGrantedAuthoritiesConverter();
         autoridades.setAuthoritiesClaimName("rol");
         autoridades.setAuthorityPrefix("ROLE_");
@@ -101,7 +107,7 @@ public class SeguridadConfig {
                 .addFilterAfter(new FiltroIdempotencia(jdbc, reloj),
                         org.springframework.security.web.access.intercept.AuthorizationFilter.class)
                 .headers(h -> h
-                        .contentSecurityPolicy(c -> c.policyDirectives("default-src 'self'; script-src 'self'; style-src 'self'; "
+                        .contentSecurityPolicy(c -> c.policyDirectives("default-src 'self'; script-src 'self'" + scripts + "; style-src 'self'" + estilos + "; " + marcos
                                 + "img-src 'self' blob: data: https://tile.openstreetmap.org" + imagenes + "; connect-src 'self'" + conexiones
                                 + "; object-src 'none'; base-uri 'none'; "
                                 + "form-action 'self'; frame-ancestors 'none'"))

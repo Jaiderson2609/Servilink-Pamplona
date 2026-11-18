@@ -1,6 +1,7 @@
 package co.edu.unipamplona.servilink.web;
 
 import co.edu.unipamplona.servilink.aplicacion.AuthService;
+import co.edu.unipamplona.servilink.aplicacion.GoogleAuthService;
 import jakarta.validation.Valid;
 import java.time.Duration;
 import java.util.Map;
@@ -20,10 +21,12 @@ public class AuthController {
     static final String RUTA_COOKIE = "/api/v1/auth";
 
     private final AuthService auth;
+    private final GoogleAuthService google;
     private final boolean cookieSegura;
 
-    public AuthController(AuthService auth, @Value("${servilink.cookie-segura:true}") boolean cookieSegura) {
+    public AuthController(AuthService auth, GoogleAuthService google, @Value("${servilink.cookie-segura:true}") boolean cookieSegura) {
         this.auth = auth;
+        this.google = google;
         this.cookieSegura = cookieSegura;
     }
 
@@ -37,6 +40,17 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<Map<String, Object>> login(@Valid @RequestBody Peticiones.Login l) {
         return conSesion(auth.iniciarSesion(l.correo(), l.clave()));
+    }
+
+    /** ID de cliente público de Google; vacío si el ingreso con Google no está configurado. */
+    @GetMapping("/google/config")
+    public Map<String, String> googleConfig() {
+        return Map.of("clientId", google.clienteId());
+    }
+
+    @PostMapping("/google")
+    public ResponseEntity<Map<String, Object>> loginGoogle(@Valid @RequestBody Peticiones.Google g) {
+        return conSesion(google.ingresar(g.credencial(), g.rol(), g.telefono(), Boolean.TRUE.equals(g.aceptaTerminos())));
     }
 
     /** Cambia la cookie de renovación por un token de acceso nuevo y rota la cookie. */

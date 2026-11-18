@@ -156,3 +156,7 @@ th { font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; color:
 .mapa-ayuda { font-size: .8rem; color: var(--tinta-suave); margin: 0 0 .6rem; }
 .solo-lectores { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .cargando { text-align: center; color: var(--tinta-suave); padding: 2rem 1rem; }
+
+.google { margin-top: 1rem; }
+.google .centrado { text-align: center; margin-bottom: .6rem; }
+.google-boton { display: flex; justify-content: center; min-height: 44px; }
