@@ -4,6 +4,7 @@ import co.edu.unipamplona.servilink.aplicacion.AdministracionService;
 import co.edu.unipamplona.servilink.aplicacion.Codigo;
 import co.edu.unipamplona.servilink.aplicacion.ErrorNegocio;
 import co.edu.unipamplona.servilink.aplicacion.NotificacionService;
+import co.edu.unipamplona.servilink.aplicacion.ParametrosService;
 import co.edu.unipamplona.servilink.aplicacion.VerificacionService;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -20,11 +21,26 @@ public class AdminController {
     private final AdministracionService admin;
     private final NotificacionService notificaciones;
     private final VerificacionService verificacion;
+    private final ParametrosService parametros;
 
-    public AdminController(AdministracionService admin, NotificacionService notificaciones, VerificacionService verificacion) {
+    public AdminController(AdministracionService admin, NotificacionService notificaciones, VerificacionService verificacion,
+                           ParametrosService parametros) {
+        this.parametros = parametros;
         this.admin = admin;
         this.notificaciones = notificaciones;
         this.verificacion = verificacion;
+    }
+
+    @GetMapping("/parameters")
+    public List<ParametrosService.Vista> parametros() {
+        return parametros.listar();
+    }
+
+    /** Cambia un parámetro; aplica solo a lo que nace después y queda en la auditoría. */
+    @PutMapping("/parameters/{clave}")
+    public ParametrosService.Vista cambiarParametro(@PathVariable String clave,
+            @Valid @RequestBody Peticiones.ParametroCambio c, @AuthenticationPrincipal Jwt jwt) {
+        return parametros.cambiar(id(jwt), clave, c.valor());
     }
 
     /** Técnicos por estado de verificación (por defecto, los que esperan revisión). */

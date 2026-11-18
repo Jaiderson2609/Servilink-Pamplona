@@ -109,7 +109,7 @@ export default function Billetera() {
       {retorno && <ResultadoRecarga referencia={retorno} silenciosa={!desdeDireccion} alTerminar={() => recargar()} />}
       <div className="rejilla">
         <div className="tarjeta estadistica"><div className="suave">Saldo disponible</div><div className="dinero">{cop(datos.saldoDisponibleCop)}</div>
-          <div className="pequeno suave">Necesitas al menos $ 40.000 para postularte</div></div>
+          <div className="pequeno suave">Necesitas al menos {cop(datos.saldoMinimoCop ?? 40000)} para postularte</div></div>
         <div className="tarjeta estadistica"><div className="suave">Comisión retenida</div><div className="dinero">{cop(datos.saldoRetenidoCop)}</div>
           <div className="pequeno suave">Se cobra al finalizar y se libera si cancelan</div></div>
       </div>

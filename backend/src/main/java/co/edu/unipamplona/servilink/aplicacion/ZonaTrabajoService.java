@@ -11,19 +11,19 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class ZonaTrabajoService {
 
-    public static final int RADIO_POR_DEFECTO_KM = 5;
-
     private final UbicacionTecnicoRepositorio ubicaciones;
     private final Clock reloj;
+    private final ParametrosService parametros;
 
-    public ZonaTrabajoService(UbicacionTecnicoRepositorio ubicaciones, Clock reloj) {
+    public ZonaTrabajoService(UbicacionTecnicoRepositorio ubicaciones, Clock reloj, ParametrosService parametros) {
+        this.parametros = parametros;
         this.ubicaciones = ubicaciones;
         this.reloj = reloj;
     }
 
     @Transactional
     public UbicacionTecnico guardar(Long tecnicoId, double lat, double lng, Integer radioKm) {
-        int radio = radioKm == null ? RADIO_POR_DEFECTO_KM : radioKm;
+        int radio = radioKm == null ? parametros.radioPorDefectoKm() : radioKm;
         var existente = ubicaciones.findById(tecnicoId);
         if (existente.isPresent()) {
             existente.get().actualizar(lat, lng, radio, reloj.instant());

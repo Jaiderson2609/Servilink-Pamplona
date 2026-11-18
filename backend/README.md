@@ -126,3 +126,18 @@ Solo un técnico con la identidad verificada ve solicitudes abiertas y puede pos
 - `GET /admin/technicians?estado=`: técnicos por estado (por defecto, los pendientes). `GET /admin/technicians/{id}/documents/{tipo}`: imagen privada, sin caché.
 - `PATCH /admin/technicians/{id}/verification` (`APPROVED` o `REJECTED` con motivo): queda en la auditoría, avisa al técnico y **borra los documentos** (mínimo dato necesario, Ley 1581 de 2012).
 - Los documentos viven en la base de datos (tabla `documentos_verificacion`), nunca en Cloudinary ni con una URL pública. La migración V11 deja aprobados a los técnicos que ya existían.
+
+## Parámetros editables del administrador
+
+`GET /admin/parameters` y `PUT /admin/parameters/{clave}` (solo ADMIN). Sin fila en la tabla `parametros` rige el valor por defecto de la configuración. Cada cambio se valida (rango y enteros), queda en la auditoría con el valor anterior y el nuevo, y aplica solo a lo que nace después: la comisión se congela al elegir al técnico y las ventanas se fijan al crear la solicitud o al recibir la primera postulación.
+
+| Clave | Por defecto | Rango | Efecto |
+| --- | --- | --- | --- |
+| `APPLY_WINDOW_S` | 600 s | 60 a 3600 | Ventana de postulación desde la creación |
+| `SELECT_WINDOW_S` | 300 s | 60 a 1800 | Ventana de elección desde la primera postulación |
+| `MAX_TOTAL_S` | 900 s | 120 a 7200 | Tope total antes de asignar; debe superar la ventana de postulación en 60 s o más |
+| `COMMISSION_PCT` | 10 % | 1 a 50 (admite decimales) | Comisión sobre el precio acordado |
+| `MIN_BALANCE` | 40000 COP | 0 a 1000000 | Saldo mínimo para postularse |
+| `SEARCH_RADIUS_M` | 5000 m | 1000 a 50000 | Radio por defecto de la zona de trabajo del técnico |
+
+`LOCATION_TTL_S` (vigencia de la ubicación) no está implementado: la zona del técnico es un punto base fijo y no una ubicación en vivo.

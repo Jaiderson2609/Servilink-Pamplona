@@ -72,6 +72,9 @@ public final class Peticiones {
             @NotNull(message = "decision es obligatoria") @Pattern(regexp = "APPROVED|REJECTED", message = "decision debe ser APPROVED o REJECTED") String decision,
             @Size(max = 200, message = "motivo admite hasta 200 caracteres") String motivo) {}
 
+    public record ParametroCambio(
+            @NotNull(message = "valor es obligatorio") @DecimalMin(value = "0", message = "valor no puede ser negativo") java.math.BigDecimal valor) {}
+
     public record MotivoAdmin(
             @NotBlank(message = "el motivo es obligatorio") @Size(min = 5, max = 200, message = "el motivo debe tener entre 5 y 200 caracteres") String motivo) {}
 }
