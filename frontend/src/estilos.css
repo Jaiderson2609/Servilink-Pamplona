@@ -159,4 +159,7 @@ th { font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; color:
 
 .google { margin-top: 1rem; }
 .google .centrado { text-align: center; margin-bottom: .6rem; }
-.google-boton { display: flex; justify-content: center; min-height: 44px; }
+.google-boton { position: relative; width: 300px; max-width: 100%; height: 44px; margin: 0 auto; }
+.google-boton .btn { display: flex; align-items: center; justify-content: center; height: 100%; margin: 0; }
+.google-boton:hover .btn { background: var(--verde-claro); }
+.google-capa { position: absolute; inset: 0; overflow: hidden; opacity: 0; cursor: pointer; }
