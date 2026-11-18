@@ -25,7 +25,7 @@ jobs:
           python-version: "3.13"
           cache: pip
           cache-dependency-path: backend-ref/requirements.txt
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: "21"
@@ -55,7 +55,7 @@ jobs:
           python-version: "3.13"
           cache: pip
           cache-dependency-path: backend-ref/requirements.txt
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: "21"
@@ -99,7 +99,7 @@ jobs:
       JWT_SECRET: ci-secreto-de-pruebas-con-mas-de-32-caracteres
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with: { distribution: temurin, java-version: "21", cache: maven }
       - run: mvn -B verify
         working-directory: backend
