@@ -171,8 +171,14 @@ jobs:
       - name: Comprobar /salud, usuario no root y base sin puertos publicados
         run: |
           curl -fsS http://127.0.0.1:8000/salud
-          test "$(docker compose exec -T api id -u)" = "10001"
-          test -z "$(docker compose port db 5432 2>/dev/null || true)"
+          uid="$(docker compose exec -T api id -u | tr -d '\r')"
+          echo "usuario del proceso: ${uid}"
+          test "${uid}" = "10001"
+          # Se mira el puerto publicado en el host (PublishedPort > 0) y no la salida de "compose port", que cambia entre versiones.
+          docker compose ps db --format json
+          publicados="$(docker compose ps db --format json | grep -Eo '"PublishedPort":[1-9][0-9]*' || true)"
+          echo "puertos publicados de la base: '${publicados}'"
+          test -z "${publicados}"
       - name: Peso de la imagen
         run: docker image ls servilink-api --format 'table {{.Repository}}\t{{.Tag}}\t{{.Size}}'
       - name: Exportar la imagen (artefacto inmutable, nombrado con el commit)
