@@ -20,7 +20,8 @@ export default function Mapa({ punto, alElegir, radioKm }) {
     <div className="mapa">
       <MapContainer center={[punto.lat, punto.lng]} zoom={radioKm && radioKm > 8 ? 10 : 14} scrollWheelZoom={false}
         attributionControl>
-        <TileLayer attribution="© colaboradores de OpenStreetMap" url="https://tile.openstreetmap.org/{z}/{x}/{y}.png" maxZoom={19} />
+        {/* OpenStreetMap exige el origen de la plataforma en el encabezado Referer; el resto del sitio sigue sin enviarlo. */}
+        <TileLayer attribution="© colaboradores de OpenStreetMap" url="https://tile.openstreetmap.org/{z}/{x}/{y}.png" maxZoom={19} referrerPolicy="origin" />
         {radioKm ? <Circle center={[punto.lat, punto.lng]} radius={radioKm * 1000} pathOptions={{ color: '#0f5e57', weight: 2, fillOpacity: 0.08 }} /> : null}
         <CircleMarker center={[punto.lat, punto.lng]} radius={9} pathOptions={{ color: '#fff', weight: 3, fillColor: '#0f5e57', fillOpacity: 1 }} />
         <Clics alElegir={alElegir} />
