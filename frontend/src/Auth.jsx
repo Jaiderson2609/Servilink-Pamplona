@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSesion } from './sesion.jsx';
 import { useUI } from './ui.jsx';
-import { traducir } from './api.js';
+import { api, traducir } from './api.js';
 
 export default function Auth() {
   const [modo, setModo] = useState('ingresar');
@@ -17,6 +17,7 @@ export default function Auth() {
           <button className="pestana" role="tab" aria-selected={modo === 'registro'} onClick={() => setModo('registro')}>Crear cuenta</button>
         </div>
         {modo === 'ingresar' ? <Login /> : <Registro />}
+        <Google />
       </div>
     </div>
   );
@@ -81,6 +82,91 @@ function Registro() {
         Acepto la política de tratamiento de datos y los términos de uso</label></div>
       <div className="error-campo" role="alert">{error}</div>
       <button className="btn ancho" type="submit" disabled={enviando}>Crear cuenta</button>
+    </form>
+  );
+}
+
+const URL_GOOGLE = 'https://accounts.google.com/gsi/client';
+
+function cargarGoogle() {
+  if (window.google?.accounts?.id) return Promise.resolve();
+  return new Promise((ok, falla) => {
+    let s = document.querySelector(`script[src="${URL_GOOGLE}"]`);
+    if (!s) { s = document.createElement('script'); s.src = URL_GOOGLE; s.async = true; document.head.appendChild(s); }
+    s.addEventListener('load', ok, { once: true });
+    s.addEventListener('error', falla, { once: true });
+  });
+}
+
+/** Botón "Continuar con Google". Solo aparece si el servidor tiene un ID de cliente configurado. */
+function Google() {
+  const { entrarConGoogle } = useSesion();
+  const [clienteId, setClienteId] = useState('');
+  const [credencial, setCredencial] = useState(null); // cuenta nueva: falta pedir rol, teléfono y términos
+  const [error, setError] = useState('');
+  const caja = useRef(null);
+  const alEntrar = useRef(null);
+
+  alEntrar.current = async (datos) => {
+    setError('');
+    try { await entrarConGoogle(datos); } catch (e) {
+      if (e.code === 'GOOGLE_REGISTRATION_REQUIRED' && !datos.rol) setCredencial(datos.credencial);
+      else setError(traducir(e));
+    }
+  };
+
+  useEffect(() => {
+    let vivo = true;
+    api('/auth/google/config').then((c) => { if (vivo) setClienteId(c?.clientId || ''); }).catch(() => {});
+    return () => { vivo = false; };
+  }, []);
+
+  useEffect(() => {
+    if (!clienteId || credencial) return undefined;
+    let vivo = true;
+    cargarGoogle().then(() => {
+      if (!vivo || !caja.current) return;
+      window.google.accounts.id.initialize({ client_id: clienteId, callback: (r) => alEntrar.current({ credencial: r.credential }) });
+      window.google.accounts.id.renderButton(caja.current, { theme: 'outline', size: 'large', text: 'continue_with', shape: 'rectangular', locale: 'es' });
+    }).catch(() => { if (vivo) setError('No se pudo cargar el ingreso con Google.'); });
+    return () => { vivo = false; };
+  }, [clienteId, credencial]);
+
+  if (!clienteId) return null;
+  if (credencial) return <CompletarGoogle credencial={credencial} enviar={(d) => alEntrar.current(d)} cancelar={() => setCredencial(null)} />;
+  return (
+    <div className="google">
+      <div className="ayuda centrado">o</div>
+      <div ref={caja} className="google-boton" />
+      <div className="error-campo" role="alert">{error}</div>
+    </div>
+  );
+}
+
+function CompletarGoogle({ credencial, enviar, cancelar }) {
+  const [f, setF] = useState({ rol: 'HOGAR', telefono: '', aceptaTerminos: false });
+  const [enviando, setEnviando] = useState(false);
+  const poner = (k) => (e) => setF({ ...f, [k]: e.target.type === 'checkbox' ? e.target.checked : e.target.value });
+  const mandar = async (ev) => {
+    ev.preventDefault();
+    setEnviando(true);
+    await enviar({ credencial, ...f });
+    setEnviando(false);
+  };
+  return (
+    <form onSubmit={mandar} className="google">
+      <p className="ayuda">Casi listo. Para crear tu cuenta con Google completa estos datos.</p>
+      <div className="campo"><label htmlFor="g-rol">Quiero</label>
+        <select id="g-rol" value={f.rol} onChange={poner('rol')}>
+          <option value="HOGAR">Necesito un técnico (hogar)</option><option value="TECNICO">Soy técnico</option>
+        </select></div>
+      <div className="campo"><label htmlFor="g-tel">Teléfono</label>
+        <input id="g-tel" type="tel" autoComplete="tel" required placeholder="3001234567" value={f.telefono} onChange={poner('telefono')} /></div>
+      <div className="campo"><label className="chequeo" htmlFor="g-acepta">
+        <input id="g-acepta" type="checkbox" required checked={f.aceptaTerminos} onChange={poner('aceptaTerminos')} />
+        Acepto la política de tratamiento de datos y los términos de uso</label></div>
+      <button className="btn ancho" type="submit" disabled={enviando}>Crear cuenta con Google</button>
+      <button className="btn sec ancho" type="button" onClick={cancelar}>Cancelar</button>
     </form>
   );
 }

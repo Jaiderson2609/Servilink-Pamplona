@@ -63,6 +63,11 @@ public class AuthService {
         if (u == null || !codificador.matches(clave, u.getPasswordHash())) {
             throw new ErrorNegocio(Codigo.UNAUTHENTICATED, "Correo o clave incorrectos");
         }
+        return abrirSesion(u);
+    }
+
+    /** Abre la sesión de una cuenta ya autenticada (por clave o por Google); las cuentas suspendidas no entran. */
+    public Sesion abrirSesion(Usuario u) {
         if (u.isSuspendido()) {
             throw new ErrorNegocio(Codigo.ACCOUNT_SUSPENDED, "Tu cuenta está suspendida; contacta al administrador");
         }
