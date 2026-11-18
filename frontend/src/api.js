@@ -16,10 +16,8 @@ export { nuevaLlave };
 /** Mensajes en español según el código estable del servidor (DDS 10 y 11.1). */
 const MENSAJES = {
   SERVICE_EXPIRED: 'El plazo de esta solicitud ya terminó.',
-  TECHNICIAN_UNAVAILABLE: 'Ese técnico acaba de tomar otro servicio. Elige otra oferta.',
   INSUFFICIENT_BALANCE: 'El técnico ya no tiene saldo suficiente para este servicio. Elige otra oferta.',
   TECHNICIAN_NOT_VERIFIED: 'Tu identidad aún no está verificada. Envía tus documentos desde la pestaña Verificación.',
-  WALLET_BELOW_MINIMUM: 'Necesitas al menos $ 40.000 de saldo para postularte. Recarga tu billetera.',
   ACTIVE_REQUEST_EXISTS: 'Ya tienes una solicitud en curso. Termínala o cancélala para crear otra.',
   DUPLICATE_APPLICATION: 'Ya enviaste una oferta a esta solicitud.',
   CHAT_CLOSED: 'El chat solo está abierto mientras el servicio está en curso.',

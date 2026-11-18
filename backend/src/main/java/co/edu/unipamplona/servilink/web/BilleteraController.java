@@ -25,9 +25,12 @@ public class BilleteraController {
     private final PasarelaPago pasarela;
     private final Configuracion config;
     private final OficioRepositorio oficios;
+    private final co.edu.unipamplona.servilink.aplicacion.ParametrosService parametros;
 
     public BilleteraController(BilleteraService billetera, RecargaService recargas, PasarelaPago pasarela,
-                               Configuracion config, OficioRepositorio oficios) {
+                               Configuracion config, OficioRepositorio oficios,
+                               co.edu.unipamplona.servilink.aplicacion.ParametrosService parametros) {
+        this.parametros = parametros;
         this.billetera = billetera;
         this.recargas = recargas;
         this.pasarela = pasarela;
@@ -40,6 +43,7 @@ public class BilleteraController {
         var m = new LinkedHashMap<>(forma(billetera.consultar(Long.valueOf(jwt.getSubject()))));
         m.put("pagoDisponible", pasarela.disponible());
         m.put("recargaDemoDisponible", config.recargaDemoHabilitada());
+        m.put("saldoMinimoCop", parametros.saldoMinimo());
         return m;
     }
 

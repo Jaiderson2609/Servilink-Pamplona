@@ -919,6 +919,48 @@ paths:
         '403': { $ref: '#/components/responses/SinPermiso' }
         '404': { $ref: '#/components/responses/NoEncontrado' }
         '409': { $ref: '#/components/responses/Conflicto' }
+  /admin/parameters:
+    get:
+      tags: [Administración]
+      summary: Parámetros del sistema con su valor vigente, valor por defecto y rango permitido
+      responses:
+        '200':
+          description: Seis parámetros editables
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Parametro' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+  /admin/parameters/{clave}:
+    put:
+      tags: [Administración]
+      summary: Cambiar un parámetro; aplica solo a lo que nace después y queda en la auditoría
+      parameters:
+        - name: clave
+          in: path
+          required: true
+          schema: { type: string, enum: [SEARCH_RADIUS_M, APPLY_WINDOW_S, SELECT_WINDOW_S, MAX_TOTAL_S, COMMISSION_PCT, MIN_BALANCE] }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [valor]
+              properties:
+                valor: { type: number, description: 'Dentro del rango del parámetro; entero salvo COMMISSION_PCT' }
+      responses:
+        '200':
+          description: Parámetro actualizado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Parametro' }
+        '400': { $ref: '#/components/responses/Invalida' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
   /admin/users:
     get:
       tags: [Administración]
@@ -1243,6 +1285,18 @@ components:
         secuencia: { type: integer, minimum: 1 }
         estado: { type: string, enum: [PENDIENTE, ACEPTADA, RECHAZADA] }
         creadaEn: { type: string, format: date-time }
+    Parametro:
+      type: object
+      required: [clave, descripcion, unidad, valor, defecto, minimo, maximo]
+      properties:
+        clave: { type: string }
+        descripcion: { type: string }
+        unidad: { type: string, enum: [m, s, '%', COP] }
+        valor: { type: number }
+        defecto: { type: number }
+        minimo: { type: number }
+        maximo: { type: number }
+        actualizadoEn: { type: string, format: date-time, nullable: true }
     EstadoVerificacion:
       type: object
       required: [estado]

@@ -1,6 +1,5 @@
 package co.edu.unipamplona.servilink.aplicacion;
 
-import co.edu.unipamplona.servilink.config.Configuracion;
 import co.edu.unipamplona.servilink.dominio.*;
 import co.edu.unipamplona.servilink.repositorio.*;
 import java.math.BigDecimal;
@@ -25,7 +24,7 @@ public class AsignacionService {
     private final MovimientoRepositorio libro;
     private final NotificacionRepositorio avisos;
     private final UsuarioRepositorio usuarios;
-    private final Configuracion config;
+    private final ParametrosService parametros;
     private final Clock reloj;
     private final PublicadorEventos eventos;
 
@@ -33,7 +32,7 @@ public class AsignacionService {
                              OfertaRepositorio ofertas,
                              BilleteraRepositorio billeteras, MovimientoRepositorio libro,
                              NotificacionRepositorio avisos, UsuarioRepositorio usuarios,
-                             Configuracion config, Clock reloj, PublicadorEventos eventos) {
+                             ParametrosService parametros, Clock reloj, PublicadorEventos eventos) {
         this.solicitudes = solicitudes;
         this.postulaciones = postulaciones;
         this.ofertas = ofertas;
@@ -41,7 +40,7 @@ public class AsignacionService {
         this.libro = libro;
         this.avisos = avisos;
         this.usuarios = usuarios;
-        this.config = config;
+        this.parametros = parametros;
         this.reloj = reloj;
         this.eventos = eventos;
     }
@@ -88,7 +87,8 @@ public class AsignacionService {
         if (solicitudes.existsByTecnicoIdAndEstadoIn(pos.getTecnicoId(), EstadoSolicitud.codigos(EstadoSolicitud.E03, EstadoSolicitud.E04))) { // RN-07
             throw new ErrorNegocio(Codigo.TECHNICIAN_UNAVAILABLE, "El técnico ya tiene un servicio activo");
         }
-        long comision = comision(pos.getPrecio(), config.comision());
+        BigDecimal pct = parametros.comision();
+        long comision = comision(pos.getPrecio(), pct);
         if (billetera.getDisponible() < comision) {
             throw new ErrorNegocio(Codigo.INSUFFICIENT_BALANCE, "No alcanza para retener la comisión");
         }
@@ -99,7 +99,7 @@ public class AsignacionService {
         sol.setEstado(EstadoSolicitud.E03.codigo());
         sol.setTecnicoId(pos.getTecnicoId());
         sol.setPrecioAcordado(pos.getPrecio());
-        sol.setComisionPct(config.comision()); // RN-14: el porcentaje queda congelado para este servicio
+        sol.setComisionPct(pct); // RN-14: el porcentaje queda congelado para este servicio
         sol.setComisionCop((int) comision);
         pos.setEstado("ELEGIDA");
         for (Postulacion otra : postulaciones.findBySolicitudId(sol.getId())) { // RF-024: se descartan las demás

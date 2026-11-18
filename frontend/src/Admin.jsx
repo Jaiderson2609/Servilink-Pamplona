@@ -4,7 +4,7 @@ import { Cargando, Insignia, Pestanas, useUI } from './ui.jsx';
 import { ir, usePolling } from './hooks.js';
 import { ACCIONES, ACTIVAS, ESTADOS, cop, fecha, recortar } from './util.js';
 
-const TABS = [['resumen', 'Resumen'], ['usuarios', 'Usuarios'], ['solicitudes', 'Solicitudes'], ['tecnicos', 'Verificación'], ['auditoria', 'Auditoría']];
+const TABS = [['resumen', 'Resumen'], ['usuarios', 'Usuarios'], ['solicitudes', 'Solicitudes'], ['tecnicos', 'Verificación'], ['parametros', 'Parámetros'], ['auditoria', 'Auditoría']];
 
 export default function Admin({ tab }) {
   const activa = TABS.some(([k]) => k === tab) ? tab : 'resumen';
@@ -16,6 +16,7 @@ export default function Admin({ tab }) {
       {activa === 'usuarios' && <Usuarios />}
       {activa === 'solicitudes' && <Solicitudes />}
       {activa === 'tecnicos' && <Verificaciones />}
+      {activa === 'parametros' && <Parametros />}
       {activa === 'auditoria' && <Auditoria />}
     </>
   );
@@ -160,7 +161,7 @@ function Auditoria() {
           <table>
             <thead><tr><th>Fecha</th><th>Acción</th><th>Objetivo</th><th>Detalle</th></tr></thead>
             <tbody>{r.items.map((a) => (
-              <tr key={a.id}><td>{fecha(a.creadaEn)}</td><td>{ACCIONES[a.accion] || a.accion}</td><td>{`${a.objetivoTipo.toLowerCase()} #${a.objetivoId}`}</td><td>{a.detalle || ''}</td></tr>
+              <tr key={a.id}><td>{fecha(a.creadaEn)}</td><td>{ACCIONES[a.accion] || a.accion}</td><td>{a.objetivoId == null ? a.objetivoTipo.toLowerCase() : `${a.objetivoTipo.toLowerCase()} #${a.objetivoId}`}</td><td>{a.detalle || ''}</td></tr>
             ))}</tbody>
           </table>
         ) : <div className="vacio">Aún no hay acciones registradas.</div>}
@@ -220,5 +221,40 @@ function Verificaciones() {
           </div>
         </div>)) : <div className="vacio">No hay técnicos esperando verificación.</div>}
     </div>
+  );
+}
+
+/** ERS 4: el administrador ajusta estos valores; cada cambio queda auditado y aplica solo a lo que nace después. */
+function Parametros() {
+  const { datos: lista, error, cargando, recargar } = usePolling(() => api('/admin/parameters'), 0, []);
+  if (cargando) return <Cargando />;
+  if (error || !lista) return <div className="vacio">No pudimos cargar los parámetros. {error?.message}</div>;
+  return (
+    <div className="pila">
+      <p className="suave">Los cambios aplican solo a servicios nuevos: la comisión se congela al elegir al técnico y las ventanas se fijan al crear la solicitud o recibir la primera postulación.</p>
+      {lista.map((p) => <FilaParametro key={p.clave} p={p} alGuardar={recargar} />)}
+    </div>
+  );
+}
+
+function FilaParametro({ p, alGuardar }) {
+  const { avisar, intentar } = useUI();
+  const [valor, setValor] = useState(String(p.valor));
+  const guardar = async (ev) => {
+    ev.preventDefault();
+    const r = await intentar(() => api(`/admin/parameters/${p.clave}`, { metodo: 'PUT', json: { valor: Number(valor) } }));
+    if (r) { avisar('Parámetro actualizado', 'ok'); alGuardar(); }
+  };
+  const id = 'par-' + p.clave;
+  return (
+    <form className="tarjeta fila entre" onSubmit={guardar}>
+      <div><label htmlFor={id}><strong>{p.descripcion}</strong></label>
+        <div className="pequeno suave">Por defecto {p.defecto} {p.unidad} · de {p.minimo} a {p.maximo} {p.unidad}{p.actualizadoEn ? ` · cambiado ${fecha(p.actualizadoEn)}` : ''}</div></div>
+      <div className="fila">
+        <div className="campo"><input id={id} type="number" step="any" min={p.minimo} max={p.maximo} required value={valor} onChange={(e) => setValor(e.target.value)} /></div>
+        <span className="suave">{p.unidad}</span>
+        <button className="btn chico" type="submit" disabled={Number(valor) === Number(p.valor)}>Guardar</button>
+      </div>
+    </form>
   );
 }

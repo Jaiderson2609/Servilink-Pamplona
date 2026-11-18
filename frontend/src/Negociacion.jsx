@@ -141,7 +141,7 @@ function FormPostular({ s, alCambiar }) {
       <h2>Enviar mi oferta</h2>
       <div className="campo"><label htmlFor="p-precio">Tu precio (COP)</label>
         <input id="p-precio" type="number" min={1000} max={5000000} step={500} required value={precio} onChange={(e) => setPrecio(e.target.value)} />
-        <div className="ayuda">Si te eligen se retiene el 10 % como comisión de tu saldo</div></div>
+        <div className="ayuda">Si te eligen se retiene la comisión vigente de tu saldo</div></div>
       <div className="campo"><label htmlFor="p-msg">Mensaje (opcional)</label>
         <textarea id="p-msg" maxLength={200} placeholder="Ej.: Llego en 20 minutos con las herramientas" value={mensaje} onChange={(e) => setMensaje(e.target.value)} /></div>
       <button className="btn ancho" type="submit">Postularme</button>

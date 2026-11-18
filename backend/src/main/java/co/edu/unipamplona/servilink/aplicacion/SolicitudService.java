@@ -1,6 +1,5 @@
 package co.edu.unipamplona.servilink.aplicacion;
 
-import co.edu.unipamplona.servilink.config.Configuracion;
 import co.edu.unipamplona.servilink.dominio.*;
 import co.edu.unipamplona.servilink.repositorio.*;
 import java.time.Clock;
@@ -37,7 +36,7 @@ public class SolicitudService {
     private final UsuarioRepositorio usuarios;
     private final UbicacionTecnicoRepositorio ubicaciones;
     private final CalificacionRepositorio calificaciones;
-    private final Configuracion config;
+    private final ParametrosService parametros;
     private final Clock reloj;
     private final PublicadorEventos eventos;
 
@@ -45,7 +44,7 @@ public class SolicitudService {
                             OfertaRepositorio ofertas,
                             BilleteraRepositorio billeteras, OficioRepositorio oficios, UsuarioRepositorio usuarios,
                             UbicacionTecnicoRepositorio ubicaciones, CalificacionRepositorio calificaciones,
-                            Configuracion config, Clock reloj, PublicadorEventos eventos) {
+                            ParametrosService parametros, Clock reloj, PublicadorEventos eventos) {
         this.solicitudes = solicitudes;
         this.postulaciones = postulaciones;
         this.ofertas = ofertas;
@@ -54,7 +53,7 @@ public class SolicitudService {
         this.usuarios = usuarios;
         this.ubicaciones = ubicaciones;
         this.calificaciones = calificaciones;
-        this.config = config;
+        this.parametros = parametros;
         this.reloj = reloj;
         this.eventos = eventos;
     }
@@ -71,7 +70,7 @@ public class SolicitudService {
             throw new ErrorNegocio(Codigo.ACTIVE_REQUEST_EXISTS, "Ya tienes una solicitud en curso");
         }
         Solicitud s = solicitudes.save(new Solicitud(hogarId, oficioId, descripcion.trim(), lat, lng,
-                ahora.plus(Duration.ofMinutes(config.ventanaPostulacionMin())), ahora));
+                ahora.plus(parametros.ventanaPostulacion()), ahora));
         eventos.solicitud(s);
         return vista(s, hogarId, "HOGAR");
     }
@@ -91,8 +90,9 @@ public class SolicitudService {
             throw new ErrorNegocio(Codigo.DUPLICATE_APPLICATION, "Ya te postulaste a esta solicitud");
         }
         long saldo = billeteras.findById(tecnicoId).map(Billetera::getDisponible).orElse(0L);
-        if (saldo < config.saldoMinimo()) { // RF-039
-            throw new ErrorNegocio(Codigo.WALLET_BELOW_MINIMUM, "Se necesita un saldo mínimo de " + config.saldoMinimo() + " COP para postularse");
+        long minimo = parametros.saldoMinimo();
+        if (saldo < minimo) { // RF-039
+            throw new ErrorNegocio(Codigo.WALLET_BELOW_MINIMUM, "Se necesita un saldo mínimo de " + minimo + " COP para postularse");
         }
         if (solicitudes.existsByTecnicoIdAndEstadoIn(tecnicoId, EstadoSolicitud.codigos(EstadoSolicitud.E03, EstadoSolicitud.E04))) { // RN-07
             throw new ErrorNegocio(Codigo.TECHNICIAN_UNAVAILABLE, "Ya tienes un servicio activo");
@@ -108,7 +108,9 @@ public class SolicitudService {
         ofertas.save(new Oferta(p.getId(), Oferta.TECNICO, precio, 1, ahora)); // la oferta inicial del técnico
         if (EstadoSolicitud.E01.es(s.getEstado())) {
             s.setEstado(EstadoSolicitud.E02.codigo());
-            s.setExpiraEn(ahora.plus(Duration.ofMinutes(config.ventanaEleccionMin())));
+            Instant limiteTotal = s.getCreadaEn().plus(parametros.tiempoMaximoTotal()); // RN-02: nunca más del tope total
+            Instant eleccion = ahora.plus(parametros.ventanaEleccion());
+            s.setExpiraEn(eleccion.isBefore(limiteTotal) ? eleccion : limiteTotal);
         }
         eventos.solicitud(s);
         return vistaPostulacion(p);

@@ -55,8 +55,8 @@ describe('cliente del API', () => {
   });
 
   it('traduce los códigos del DDS a mensajes en español', () => {
-    expect(traducir({ code: 'WALLET_BELOW_MINIMUM', message: 'x' })).toContain('$ 40.000');
-    expect(traducir({ code: 'TECHNICIAN_UNAVAILABLE', message: 'x' })).toContain('otro servicio');
+    expect(traducir({ code: 'SERVICE_EXPIRED', message: 'x' })).toContain('plazo');
+    expect(traducir({ code: 'WALLET_BELOW_MINIMUM', message: 'Se necesita un saldo mínimo de 40000 COP' })).toContain('40000'); // el valor vigente lo dice el servidor
     expect(traducir({ code: 'OTRO', message: 'Mensaje del servidor' })).toBe('Mensaje del servidor');
   });
 });
