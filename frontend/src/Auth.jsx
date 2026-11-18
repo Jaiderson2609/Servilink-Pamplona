@@ -127,7 +127,7 @@ function Google() {
     cargarGoogle().then(() => {
       if (!vivo || !caja.current) return;
       window.google.accounts.id.initialize({ client_id: clienteId, callback: (r) => alEntrar.current({ credencial: r.credential }) });
-      window.google.accounts.id.renderButton(caja.current, { theme: 'outline', size: 'large', text: 'continue_with', shape: 'rectangular', locale: 'es' });
+      window.google.accounts.id.renderButton(caja.current, { theme: 'outline', size: 'large', text: 'continue_with', shape: 'rectangular', locale: 'es', width: 300 });
     }).catch(() => { if (vivo) setError('No se pudo cargar el ingreso con Google.'); });
     return () => { vivo = false; };
   }, [clienteId, credencial]);
@@ -137,7 +137,11 @@ function Google() {
   return (
     <div className="google">
       <div className="ayuda centrado">o</div>
-      <div ref={caja} className="google-boton" />
+      {/* El botón que se ve es de la plataforma; el de Google va encima, invisible y recortado al mismo tamaño. */}
+      <div className="google-boton">
+        <span className="btn sec ancho" aria-hidden="true">Continuar con Google</span>
+        <div ref={caja} className="google-capa" />
+      </div>
       <div className="error-campo" role="alert">{error}</div>
     </div>
   );
