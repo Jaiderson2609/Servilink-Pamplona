@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react';
+
 const ICONOS = {
   nueva: 'M12 5v14M5 12h14',
   solicitudes: 'M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01',
@@ -30,30 +32,47 @@ export function Marca({ claro }) {
   );
 }
 
-/** Panel lateral de navegación: opciones del rol, tarjeta de la persona y salida. En pantallas angostas pasa arriba. */
+/** Panel lateral de navegación: opciones del rol, tarjeta de la persona y salida. En pantallas angostas es un menú que se abre desde la izquierda. */
 export default function Lateral({ yo, base, items, activa, salir }) {
+  const [abierto, setAbierto] = useState(false);
+  useEffect(() => {
+    const cerrar = () => setAbierto(false);
+    const tecla = (e) => { if (e.key === 'Escape') setAbierto(false); };
+    window.addEventListener('hashchange', cerrar);
+    window.addEventListener('keydown', tecla);
+    return () => { window.removeEventListener('hashchange', cerrar); window.removeEventListener('keydown', tecla); };
+  }, []);
   return (
-    <aside className="lateral">
-      <div className="lat-arriba">
+    <>
+      <div className="lat-barra">
+        <button type="button" className="lat-menu" aria-label={abierto ? 'Cerrar menú' : 'Abrir menú'} aria-expanded={abierto} aria-controls="lat-panel" onClick={() => setAbierto(!abierto)}>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
+        </button>
         <Marca claro />
-        <nav className="lat-nav" aria-label="Principal">
-          {items.map(([k, t]) => (
-            <a key={k} href={`#/${base}/${k}`} className="lat-item" aria-current={k === activa ? 'page' : undefined}>
-              <Icono k={k} />{t}
-            </a>
-          ))}
-        </nav>
       </div>
-      <div className="lat-yo">
-        <div className="lat-persona">
-          <span className="lat-avatar" aria-hidden="true">{(yo.nombre || '?').trim().charAt(0).toUpperCase()}</span>
-          <span className="lat-datos">
-            <span className="lat-nombre">{yo.nombre}</span>
-            <span className="lat-rol">{yo.rol.toLowerCase()}</span>
-          </span>
+      {abierto && <div className="lat-fondo" onClick={() => setAbierto(false)} aria-hidden="true" />}
+      <aside id="lat-panel" className={'lateral' + (abierto ? ' abierto' : '')}>
+        <div className="lat-arriba">
+          <Marca claro />
+          <nav className="lat-nav" aria-label="Principal">
+            {items.map(([k, t]) => (
+              <a key={k} href={`#/${base}/${k}`} className="lat-item" aria-current={k === activa ? 'page' : undefined}>
+                <Icono k={k} />{t}
+              </a>
+            ))}
+          </nav>
         </div>
-        <button type="button" className="lat-salir" onClick={() => salir()}>Salir</button>
-      </div>
-    </aside>
+        <div className="lat-yo">
+          <div className="lat-persona">
+            <span className="lat-avatar" aria-hidden="true">{(yo.nombre || '?').trim().charAt(0).toUpperCase()}</span>
+            <span className="lat-datos">
+              <span className="lat-nombre">{yo.nombre}</span>
+              <span className="lat-rol">{yo.rol.toLowerCase()}</span>
+            </span>
+          </div>
+          <button type="button" className="lat-salir" onClick={() => salir()}>Salir</button>
+        </div>
+      </aside>
+    </>
   );
 }

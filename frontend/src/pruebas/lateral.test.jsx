@@ -87,3 +87,20 @@ describe('menuDe', () => {
     expect(menuDe('ADMIN', { vista: 'a', tab: 'nada' }).activa).toBe('resumen');
   });
 });
+
+describe('menú en pantallas angostas', () => {
+  it('el botón abre y cierra el panel, y navegar lo cierra', async () => {
+    sesionComo(HOGAR);
+    simularApi({ 'GET /service-requests/mine': [], 'GET /trades': [] });
+    pintar(<App />);
+    const boton = await screen.findByRole('button', { name: 'Abrir menú' });
+    expect(boton).toHaveAttribute('aria-expanded', 'false');
+    await userEvent.click(boton);
+    expect(screen.getByRole('button', { name: 'Cerrar menú' })).toHaveAttribute('aria-expanded', 'true');
+    await userEvent.keyboard('{Escape}');
+    expect(screen.getByRole('button', { name: 'Abrir menú' })).toHaveAttribute('aria-expanded', 'false');
+    await userEvent.click(screen.getByRole('button', { name: 'Abrir menú' }));
+    window.location.hash = '#/h/solicitudes';
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Abrir menú' })).toHaveAttribute('aria-expanded', 'false'));
+  });
+});

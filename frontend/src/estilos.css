@@ -59,6 +59,7 @@ a { color: var(--verde); }
 .lat-rol { font-size: .85rem; color: #cfe9e5; text-transform: capitalize; }
 .lat-salir { height: 40px; border: 1.5px solid rgba(255, 255, 255, .55); border-radius: 10px; background: transparent; color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
 .lat-salir:hover { background: rgba(255, 255, 255, .14); }
+.lat-barra { display: none; }
 .lateral a:focus-visible, .lateral button:focus-visible { outline-color: #ffe08a; }
 
 .contenedor { flex: 1; min-width: 0; max-width: 1120px; margin: 0 auto; padding: 2.25rem 2.75rem 4rem; }
@@ -203,15 +204,16 @@ th { font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; color: 
 .ingreso-tarjeta { width: 100%; max-width: 420px; background: #fff; border-radius: 24px; padding: 30px 32px 32px; box-shadow: 0 18px 50px rgba(15, 94, 87, .18), 0 2px 6px rgba(0, 0, 0, .05); }
 .ingreso-tarjeta h2 { font-size: 1.65rem; color: #12302d; margin-bottom: .2rem; }
 
-/* --- Pantallas angostas: el panel lateral pasa arriba --- */
+/* --- Pantallas angostas: el panel lateral es un menú que se abre desde la izquierda --- */
 @media (max-width: 860px) {
   .app { flex-direction: column; }
-  .lateral { position: static; width: 100%; height: auto; flex-direction: row; flex-wrap: wrap; align-items: center; padding: 14px 16px; gap: 12px; }
-  .lat-arriba { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 12px; width: 100%; }
-  .lat-nav { flex-direction: row; overflow-x: auto; width: 100%; padding-bottom: 2px; }
-  .lat-item { min-height: 40px; padding: 0 12px; font-size: .95rem; }
-  .lat-yo { flex-direction: row; align-items: center; justify-content: space-between; width: 100%; padding: 10px 12px; }
-  .lat-salir { padding: 0 16px; }
+  .lat-barra { position: sticky; top: 0; z-index: 30; display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: linear-gradient(170deg, var(--verde) 0%, var(--verde-medio) 100%); }
+  .lat-menu { width: 44px; height: 44px; border: 0; border-radius: 12px; background: rgba(255, 255, 255, .16); color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+  .lat-barra .lat-marca { font-size: 1rem; }
+  .lat-fondo { position: fixed; inset: 0; z-index: 40; background: rgba(10, 30, 28, .5); }
+  .lateral { position: fixed; z-index: 50; top: 0; bottom: 0; left: 0; width: min(290px, 82vw); height: auto; transform: translateX(-100%); visibility: hidden; box-shadow: 8px 0 30px rgba(0, 0, 0, .25); }
+  .lateral.abierto { transform: none; visibility: visible; }
+  @media (prefers-reduced-motion: no-preference) { .lateral { transition: transform .2s, visibility .2s; } }
   .contenedor { padding: 1.25rem 1rem 4rem; }
   .ingreso { flex-direction: column; }
   /* En el celular el formulario va de inmediato: del panel verde solo queda la barra con la marca. */
