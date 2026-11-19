@@ -214,10 +214,10 @@ th { font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; color: 
   .lat-salir { padding: 0 16px; }
   .contenedor { padding: 1.25rem 1rem 4rem; }
   .ingreso { flex-direction: column; }
-  .ingreso-izq { width: 100%; max-width: none; padding: 28px 20px; gap: 20px; }
-  .ingreso-izq h1 { font-size: 1.9rem; }
-  .puntos, .ingreso-pie { display: none; }
-  .ingreso-der { padding: 1.5rem 1rem 2.5rem; }
+  /* En el celular el formulario va de inmediato: del panel verde solo queda la barra con la marca. */
+  .ingreso-izq { width: 100%; max-width: none; padding: 14px 20px; gap: 0; }
+  .ingreso-texto, .ingreso-pie { display: none; }
+  .ingreso-der { padding: 1.25rem 1rem 2.5rem; align-items: flex-start; }
   .ingreso-tarjeta { padding: 24px 20px; }
 }
 
