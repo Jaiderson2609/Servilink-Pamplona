@@ -2,23 +2,51 @@ import { useEffect, useRef, useState } from 'react';
 import { useSesion } from './sesion.jsx';
 import { useUI } from './ui.jsx';
 import { api, traducir } from './api.js';
+import { Marca } from './Lateral.jsx';
+
+const OFICIOS = ['Plomería', 'Electricidad', 'Cerrajería', 'Gas', 'Pintura'];
+const PUNTOS = [
+  ['M4 5h16v11H8l-4 4z', 'Publica en un minuto'],
+  ['M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z', 'Recibe ofertas y negocia el precio'],
+  ['M12 3l8 3v6c0 4.5-3.2 7.9-8 9-4.8-1.1-8-4.5-8-9V6zM8.5 12l2.5 2.5 4.5-5', 'Elige entre técnicos verificados'],
+];
 
 export default function Auth() {
   const [modo, setModo] = useState('ingresar');
   return (
-    <div className="estrecho">
-      <div className="hero">
-        <h1>Técnicos de confianza, cerca de ti</h1>
-        <p>Publica lo que necesitas, recibe ofertas de técnicos de Pamplona y elige tú.</p>
-      </div>
-      <div className="tarjeta">
-        <div className="pestanas" role="tablist">
-          <button className="pestana" role="tab" aria-selected={modo === 'ingresar'} onClick={() => setModo('ingresar')}>Ingresar</button>
-          <button className="pestana" role="tab" aria-selected={modo === 'registro'} onClick={() => setModo('registro')}>Crear cuenta</button>
+    <div className="ingreso">
+      <section className="ingreso-izq">
+        <Marca claro />
+        <div className="ingreso-texto">
+          <h1>Técnicos de confianza, cerca de ti</h1>
+          <p>Publica lo que necesitas, recibe ofertas de técnicos de Pamplona y elige tú.</p>
+          <ul className="chips">
+            {OFICIOS.map((o) => <li key={o}>{o}</li>)}
+            <li className="mas">y más</li>
+          </ul>
+          <ul className="puntos">
+            {PUNTOS.map(([d, t]) => (
+              <li key={t}>
+                <span className="punto-icono"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={d} /></svg></span>
+                {t}
+              </li>
+            ))}
+          </ul>
         </div>
-        {modo === 'ingresar' ? <Login /> : <Registro />}
-        <Google />
-      </div>
+        <p className="ingreso-pie">Hecho en Pamplona, Norte de Santander</p>
+      </section>
+      <section className="ingreso-der">
+        <div className="ingreso-tarjeta">
+          <h2>{modo === 'ingresar' ? 'Bienvenido de nuevo' : 'Crea tu cuenta'}</h2>
+          <p className="suave">{modo === 'ingresar' ? 'Ingresa a tu cuenta para continuar.' : 'Es gratis y toma un minuto.'}</p>
+          <div className="pestanas" role="tablist">
+            <button className="pestana" role="tab" aria-selected={modo === 'ingresar'} onClick={() => setModo('ingresar')}>Ingresar</button>
+            <button className="pestana" role="tab" aria-selected={modo === 'registro'} onClick={() => setModo('registro')}>Crear cuenta</button>
+          </div>
+          {modo === 'ingresar' ? <Login /> : <Registro />}
+          <Google />
+        </div>
+      </section>
     </div>
   );
 }
@@ -43,7 +71,7 @@ function Login() {
       <div className="campo"><label htmlFor="l-clave">Clave</label>
         <input id="l-clave" type="password" autoComplete="current-password" required value={clave} onChange={(e) => setClave(e.target.value)} /></div>
       <div className="error-campo" role="alert">{error}</div>
-      <button className="btn ancho" type="submit" disabled={enviando}>Ingresar</button>
+      <button className="btn acento ancho" type="submit" disabled={enviando}>Ingresar</button>
     </form>
   );
 }
@@ -81,7 +109,7 @@ function Registro() {
         <input id="r-acepta" type="checkbox" required checked={f.aceptaTerminos} onChange={poner('aceptaTerminos')} />
         Acepto la política de tratamiento de datos y los términos de uso</label></div>
       <div className="error-campo" role="alert">{error}</div>
-      <button className="btn ancho" type="submit" disabled={enviando}>Crear cuenta</button>
+      <button className="btn acento ancho" type="submit" disabled={enviando}>Crear cuenta</button>
     </form>
   );
 }

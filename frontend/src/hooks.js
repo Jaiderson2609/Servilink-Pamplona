@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { RESPALDO_MS, eventosConectados, suscribirEventos } from './eventos.js';
 
-/** Rutas con hash: #/ · #/s/12 (solicitud) · #/t/billetera · #/a/usuarios */
+/** Rutas con hash: #/ · #/s/12 (solicitud) · #/h/solicitudes · #/t/billetera · #/a/usuarios */
 export function parsearRuta(hash) {
   const [, vista, valor] = (hash || '').split('/');
   if (vista === 's' && /^\d+$/.test(valor || '')) return { vista: 's', id: Number(valor) };
-  if (vista === 't' || vista === 'a') return { vista, tab: valor || null };
+  if (vista === 't' || vista === 'a' || vista === 'h') return { vista, tab: valor || null };
   return { vista: 'inicio' };
 }
 

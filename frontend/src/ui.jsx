@@ -83,14 +83,4 @@ export function Insignia({ estado }) {
   return <span className={'insignia ' + c}>{t}</span>;
 }
 
-export function Pestanas({ items, activa, alCambiar }) {
-  return (
-    <div className="pestanas" role="tablist">
-      {items.map(([k, t]) => (
-        <button key={k} className="pestana" role="tab" aria-selected={k === activa} onClick={() => alCambiar(k)}>{t}</button>
-      ))}
-    </div>
-  );
-}
-
 export const Cargando = ({ texto = 'Cargando…' }) => <div className="cargando" role="status">{texto}</div>;

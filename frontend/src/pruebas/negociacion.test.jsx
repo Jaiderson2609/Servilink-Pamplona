@@ -100,15 +100,38 @@ describe('negociación del técnico', () => {
 });
 
 describe('disponibilidad del técnico', () => {
-  it('cambia el estado con PATCH /technicians/me/availability', async () => {
+  const montar = (estado) => simularApi({
+    'GET /technicians/me/availability': { estado },
+    'PATCH /technicians/me/availability': (init) => JSON.parse(init.body),
+    'GET /service-requests/open': [], 'GET /technicians/me/location': [404, { code: 'NOT_FOUND', message: 'x', traceId: 't' }],
+  });
+  const parche = (llamadas) => llamadas.find((l) => l.metodo === 'PATCH')?.cuerpo;
+
+  it('el interruptor apaga la disponibilidad con PATCH /technicians/me/availability', async () => {
     sesionComo(TECNICO);
-    const llamadas = simularApi({
-      'GET /technicians/me/availability': { estado: 'AVAILABLE' },
-      'PATCH /technicians/me/availability': { estado: 'BUSY' },
-      'GET /service-requests/open': [], 'GET /technicians/me/location': [404, { code: 'NOT_FOUND', message: 'x', traceId: 't' }],
-    });
+    const llamadas = montar('AVAILABLE');
     pintar(<Tecnico tab="oportunidades" />);
-    await userEvent.selectOptions(await screen.findByLabelText('Mi disponibilidad'), 'BUSY');
-    await waitFor(() => expect(llamadas.find((l) => l.metodo === 'PATCH')?.cuerpo).toEqual({ estado: 'BUSY' }));
+    const sw = await screen.findByRole('switch', { name: 'Mi disponibilidad' });
+    expect(sw).toHaveAttribute('aria-checked', 'true');
+    await userEvent.click(sw);
+    await waitFor(() => expect(parche(llamadas)).toEqual({ estado: 'OFFLINE' }));
+  });
+
+  it('estando desconectado, el interruptor lo vuelve a poner disponible', async () => {
+    sesionComo(TECNICO);
+    const llamadas = montar('OFFLINE');
+    pintar(<Tecnico tab="oportunidades" />);
+    const sw = await screen.findByRole('switch', { name: 'Mi disponibilidad' });
+    expect(sw).toHaveAttribute('aria-checked', 'false');
+    await userEvent.click(sw);
+    await waitFor(() => expect(parche(llamadas)).toEqual({ estado: 'AVAILABLE' }));
+  });
+
+  it('permite marcarse como ocupado', async () => {
+    sesionComo(TECNICO);
+    const llamadas = montar('AVAILABLE');
+    pintar(<Tecnico tab="oportunidades" />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Marcar como ocupado' }));
+    await waitFor(() => expect(parche(llamadas)).toEqual({ estado: 'BUSY' }));
   });
 });
