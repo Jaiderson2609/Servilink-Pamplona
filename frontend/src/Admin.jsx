@@ -1,17 +1,15 @@
 import { useEffect, useState } from 'react';
 import { api } from './api.js';
-import { Cargando, Insignia, Pestanas, useUI } from './ui.jsx';
+import { Cargando, Insignia, useUI } from './ui.jsx';
+import { pestanaAdmin } from './menus.js';
 import { ir, usePolling } from './hooks.js';
 import { ACCIONES, ACTIVAS, ESTADOS, cop, fecha, recortar } from './util.js';
 
-const TABS = [['resumen', 'Resumen'], ['usuarios', 'Usuarios'], ['solicitudes', 'Solicitudes'], ['tecnicos', 'Verificación'], ['parametros', 'Parámetros'], ['auditoria', 'Auditoría']];
-
 export default function Admin({ tab }) {
-  const activa = TABS.some(([k]) => k === tab) ? tab : 'resumen';
+  const activa = pestanaAdmin(tab);
   return (
     <>
       <h1>Panel de administración</h1>
-      <Pestanas items={TABS} activa={activa} alCambiar={(k) => ir(`#/a/${k}`)} />
       {activa === 'resumen' && <Resumen />}
       {activa === 'usuarios' && <Usuarios />}
       {activa === 'solicitudes' && <Solicitudes />}

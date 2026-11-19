@@ -6,8 +6,9 @@ import { usePolling, ir } from './hooks.js';
 import { ACTIVAS, PAMPLONA, nombrePila } from './util.js';
 import { ListaSolicitudes } from './Solicitudes.jsx';
 import Ubicacion from './Ubicacion.jsx';
+import { pestanaHogar } from './menus.js';
 
-export default function Hogar() {
+export default function Hogar({ tab }) {
   const { yo } = useSesion();
   const { datos, error, cargando } = usePolling(async () => {
     const [mias, oficios] = await Promise.all([api('/service-requests/mine'), api('/trades')]);
@@ -18,9 +19,20 @@ export default function Hogar() {
   if (error || !datos) return <div className="vacio">No pudimos cargar tus solicitudes. {error?.message}</div>;
   const activa = datos.mias.find((s) => ACTIVAS.includes(s.estado));
 
+  if (pestanaHogar(tab) === 'solicitudes') {
+    return (
+      <>
+        <h1>Mis solicitudes</h1>
+        <p className="suave">Sigue el estado de lo que has publicado.</p>
+        <ListaSolicitudes lista={datos.mias} vacio="Aún no tienes solicitudes." />
+      </>
+    );
+  }
+
   return (
     <>
       <h1>Hola, {nombrePila(yo.nombre)}</h1>
+      <p className="suave">Cuéntanos qué necesitas y los técnicos de Pamplona te enviarán ofertas.</p>
       {activa ? (
         <div className="tarjeta">
           <h2>Tu solicitud activa</h2>
@@ -28,8 +40,6 @@ export default function Hogar() {
           <ListaSolicitudes lista={[activa]} vacio="" />
         </div>
       ) : <NuevaSolicitud oficios={datos.oficios} />}
-      <h2>Mis solicitudes</h2>
-      <ListaSolicitudes lista={datos.mias.filter((s) => s !== activa)} vacio="Aún no tienes solicitudes anteriores." />
     </>
   );
 }
@@ -71,7 +81,7 @@ function NuevaSolicitud({ oficios }) {
         <div className="ayuda"><span className="pequeno suave">{descripcion.length} / 500</span> · mínimo 10 caracteres</div></div>
       <div className="campo"><label>¿Dónde?</label><Ubicacion valor={ubicacion} alCambiar={setUbicacion} /></div>
       <p className="pequeno suave">Los técnicos tienen 10 minutos para ofertar. Después tendrás 5 minutos para elegir.</p>
-      <button className="btn ancho" type="submit" disabled={enviando}>Publicar solicitud</button>
+      <button className="btn acento ancho" type="submit" disabled={enviando}>Publicar solicitud</button>
     </form>
   );
 }

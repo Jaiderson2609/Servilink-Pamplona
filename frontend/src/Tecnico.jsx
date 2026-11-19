@@ -1,25 +1,23 @@
 import { useEffect, useState } from 'react';
 import { api } from './api.js';
 import { useSesion } from './sesion.jsx';
-import { Cargando, Pestanas, useUI } from './ui.jsx';
+import { Cargando, useUI } from './ui.jsx';
 import { ir, usePolling } from './hooks.js';
 import { PAMPLONA, metros, nombrePila } from './util.js';
 import { ListaSolicitudes } from './Solicitudes.jsx';
 import Ubicacion from './Ubicacion.jsx';
 import Billetera, { referenciaDeRetorno } from './Billetera.jsx';
-
-const TABS = [['oportunidades', 'Oportunidades'], ['servicios', 'Mis servicios'], ['billetera', 'Billetera'], ['zona', 'Zona de trabajo'], ['verificacion', 'Verificación']];
+import { pestanaTecnico } from './menus.js';
 
 export default function Tecnico({ tab }) {
   const { yo } = useSesion();
   const retorno = referenciaDeRetorno();
   // Wompi devuelve al técnico a la raíz del sitio con ?recarga=…: se lo lleva a la billetera a ver el resultado.
-  const activa = retorno ? 'billetera' : TABS.some(([k]) => k === tab) ? tab : 'oportunidades';
+  const activa = pestanaTecnico(tab);
   useEffect(() => { if (retorno && tab !== 'billetera') ir('#/t/billetera'); }, [retorno, tab]);
   return (
     <>
       <div className="fila entre"><h1>Hola, {nombrePila(yo.nombre)}</h1><Disponibilidad /></div>
-      <Pestanas items={TABS} activa={activa} alCambiar={(k) => ir(`#/t/${k}`)} />
       {activa === 'oportunidades' && <Oportunidades />}
       {activa === 'servicios' && <Servicios />}
       {activa === 'billetera' && <Billetera />}
@@ -29,22 +27,28 @@ export default function Tecnico({ tab }) {
   );
 }
 
-const ESTADOS = [['AVAILABLE', 'Disponible'], ['BUSY', 'Ocupado'], ['OFFLINE', 'Desconectado']];
+const ESTADOS = { AVAILABLE: 'Disponible', BUSY: 'Ocupado', OFFLINE: 'No disponible' };
 
-/** RF-019: solo un técnico disponible ve solicitudes y puede postularse. */
+/** RF-019: solo un técnico disponible ve solicitudes y puede postularse. El interruptor alterna Disponible / No disponible. */
 function Disponibilidad() {
   const { intentar, avisar } = useUI();
   const { datos, recargar } = usePolling(() => api('/technicians/me/availability'), 0, []);
-  const cambiar = async (ev) => {
-    const r = await intentar(() => api('/technicians/me/availability', { metodo: 'PATCH', json: { estado: ev.target.value } }));
+  const poner = async (estado) => {
+    const r = await intentar(() => api('/technicians/me/availability', { metodo: 'PATCH', json: { estado } }));
     if (r) { avisar('Disponibilidad actualizada', 'ok'); recargar(); }
   };
   if (!datos) return null;
+  const activo = datos.estado === 'AVAILABLE';
   return (
-    <div className="campo"><label htmlFor="t-disp" className="pequeno suave">Mi disponibilidad</label>
-      <select id="t-disp" value={datos.estado} onChange={cambiar}>
-        {ESTADOS.map(([k, t]) => <option key={k} value={k}>{t}</option>)}
-      </select></div>
+    <div className="disp">
+      <div className="disp-texto">
+        <span id="t-disp-etq" className="disp-titulo">Mi disponibilidad</span>
+        <span className="pequeno suave">{ESTADOS[datos.estado] || datos.estado}{activo ? ' · recibes avisos de nuevas solicitudes' : ''}</span>
+        {activo && <button type="button" className="enlace pequeno" onClick={() => poner('BUSY')}>Marcar como ocupado</button>}
+      </div>
+      <button type="button" role="switch" aria-checked={activo} aria-labelledby="t-disp-etq" className="interruptor"
+        onClick={() => poner(activo ? 'OFFLINE' : 'AVAILABLE')}><span className="perilla" /></button>
+    </div>
   );
 }
 
