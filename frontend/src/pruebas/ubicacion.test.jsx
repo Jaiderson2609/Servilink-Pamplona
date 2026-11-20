@@ -5,7 +5,8 @@ import userEvent from '@testing-library/user-event';
 import { pintar, sesionComo, simularApi } from './apoyo.jsx';
 import Ubicacion from '../Ubicacion.jsx';
 
-vi.mock('../Mapa.jsx', () => ({ default: () => <div data-testid="mapa" /> })); // Leaflet necesita un navegador real
+// Leaflet necesita un navegador real: el mapa falso es un botón que "toca" un punto distinto.
+vi.mock('../Mapa.jsx', () => ({ default: ({ alElegir }) => <button type="button" data-testid="mapa" onClick={() => alElegir({ lat: 7.5, lng: -72.6 })}>Mapa</button> }));
 
 const LUGARES = [
   { nombre: 'Carrera 5, Centro, Pamplona, Norte de Santander, Colombia', lat: 7.377234, lng: -72.647312 },
@@ -34,7 +35,7 @@ describe('búsqueda de direcciones', () => {
   it('no busca mientras se escribe: solo al tocar "Buscar"', async () => {
     const llamadas = preparar();
     pintar(<Contenedor />);
-    await userEvent.type(screen.getByLabelText('Buscar dirección'), 'Carrera 5 Pamplona');
+    await userEvent.type(screen.getByLabelText('Dirección'), 'Carrera 5 Pamplona');
     expect(llamadasBusqueda(llamadas)).toHaveLength(0);
     await userEvent.click(screen.getByRole('button', { name: 'Buscar' }));
     await screen.findByText(LUGARES[0].nombre);
@@ -45,7 +46,7 @@ describe('búsqueda de direcciones', () => {
   it('muestra los resultados, y al elegir uno fija el punto y recuerda el nombre', async () => {
     preparar();
     pintar(<Contenedor />);
-    await userEvent.type(screen.getByLabelText('Buscar dirección'), 'Carrera 5');
+    await userEvent.type(screen.getByLabelText('Dirección'), 'Carrera 5');
     await userEvent.click(screen.getByRole('button', { name: 'Buscar' }));
     expect(await screen.findByText(/2 resultados/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: LUGARES[1].nombre }));
@@ -58,7 +59,7 @@ describe('búsqueda de direcciones', () => {
     const llamadas = preparar();
     const alEnviar = vi.fn();
     pintar(<Contenedor alEnviar={alEnviar} />);
-    await userEvent.type(screen.getByLabelText('Buscar dirección'), 'Carrera 5 Pamplona{Enter}');
+    await userEvent.type(screen.getByLabelText('Dirección'), 'Carrera 5 Pamplona{Enter}');
     await screen.findByText(LUGARES[0].nombre);
     expect(llamadasBusqueda(llamadas)).toHaveLength(1);
     expect(alEnviar).not.toHaveBeenCalled();
@@ -67,7 +68,7 @@ describe('búsqueda de direcciones', () => {
   it('con menos de 3 caracteres no consulta y lo explica', async () => {
     const llamadas = preparar();
     pintar(<Contenedor />);
-    await userEvent.type(screen.getByLabelText('Buscar dirección'), 'ab');
+    await userEvent.type(screen.getByLabelText('Dirección'), 'ab');
     await userEvent.click(screen.getByRole('button', { name: 'Buscar' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('al menos 3 caracteres');
     expect(llamadasBusqueda(llamadas)).toHaveLength(0);
@@ -76,7 +77,7 @@ describe('búsqueda de direcciones', () => {
   it('sin coincidencias sugiere otra forma de ubicarse', async () => {
     preparar({ 'GET /geocoding/search': [] });
     pintar(<Contenedor />);
-    await userEvent.type(screen.getByLabelText('Buscar dirección'), 'zzzz inexistente');
+    await userEvent.type(screen.getByLabelText('Dirección'), 'zzzz inexistente');
     await userEvent.click(screen.getByRole('button', { name: 'Buscar' }));
     expect(await screen.findByText(/No encontramos esa dirección/)).toBeInTheDocument();
   });
@@ -84,7 +85,7 @@ describe('búsqueda de direcciones', () => {
   it('si el buscador no está disponible avisa en español y el mapa sigue sirviendo', async () => {
     preparar({ 'GET /geocoding/search': [503, { code: 'GEOCODING_UNAVAILABLE', message: 'x', traceId: 't' }] });
     pintar(<Contenedor />);
-    await userEvent.type(screen.getByLabelText('Buscar dirección'), 'Pamplona');
+    await userEvent.type(screen.getByLabelText('Dirección'), 'Pamplona');
     await userEvent.click(screen.getByRole('button', { name: 'Buscar' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('El buscador de direcciones no está disponible');
     expect(screen.getByTestId('mapa')).toBeInTheDocument();
@@ -94,7 +95,7 @@ describe('búsqueda de direcciones', () => {
   it('con demasiadas peticiones seguidas lo dice con claridad', async () => {
     preparar({ 'GET /geocoding/search': [429, { code: 'RATE_LIMITED', message: 'x', traceId: 't' }] });
     pintar(<Contenedor />);
-    await userEvent.type(screen.getByLabelText('Buscar dirección'), 'Pamplona');
+    await userEvent.type(screen.getByLabelText('Dirección'), 'Pamplona');
     await userEvent.click(screen.getByRole('button', { name: 'Buscar' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Espera un poco e intenta de nuevo');
   });
@@ -106,7 +107,7 @@ describe('búsqueda de direcciones', () => {
     const fetchSimulado = globalThis.fetch;
     globalThis.fetch = (...args) => espera.then(() => fetchSimulado(...args)); // la respuesta tarda hasta que la prueba la libere
     pintar(<Contenedor />);
-    await userEvent.type(screen.getByLabelText('Buscar dirección'), 'Pamplona');
+    await userEvent.type(screen.getByLabelText('Dirección'), 'Pamplona');
     await userEvent.click(screen.getByRole('button', { name: 'Buscar' }));
     expect(await screen.findByRole('button', { name: 'Buscando…' })).toBeDisabled();
     liberar();
@@ -122,13 +123,20 @@ describe('búsqueda de direcciones', () => {
   it('si luego se mueve el punto, el nombre fijado deja de mostrarse', async () => {
     preparar();
     pintar(<Contenedor />);
-    await userEvent.type(screen.getByLabelText('Buscar dirección'), 'Carrera 5');
+    await userEvent.type(screen.getByLabelText('Dirección'), 'Carrera 5');
     await userEvent.click(screen.getByRole('button', { name: 'Buscar' }));
     await userEvent.click(await screen.findByRole('button', { name: LUGARES[0].nombre }));
     expect(screen.getByText(/Punto fijado en:/)).toBeInTheDocument();
-    const lat = screen.getByLabelText('Latitud');
-    await userEvent.clear(lat);
-    await userEvent.type(lat, '7.5');
+    await userEvent.click(screen.getByTestId('mapa'));
+    expect(screen.getByTestId('punto')).toHaveTextContent('7.5,-72.6');
     await waitFor(() => expect(screen.queryByText(/Punto fijado en:/)).not.toBeInTheDocument());
+  });
+
+  it('no pide latitud ni longitud: el punto sale del mapa o de la dirección', () => {
+    preparar();
+    pintar(<Contenedor />);
+    expect(screen.queryByLabelText('Latitud')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Longitud')).not.toBeInTheDocument();
+    expect(screen.getByText('Toca el mapa para mover el punto')).toBeInTheDocument();
   });
 });

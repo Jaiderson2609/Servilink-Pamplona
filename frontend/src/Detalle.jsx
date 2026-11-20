@@ -5,6 +5,7 @@ import { Cargando, Insignia, useUI } from './ui.jsx';
 import { ir, useAhora, useEventos, usePolling } from './hooks.js';
 import { RESPALDO_MS, eventosConectados } from './eventos.js';
 import Fotos from './Fotos.jsx';
+import { Icono } from './iconos.jsx';
 import { OfertasHogar, PanelTecnico } from './Negociacion.jsx';
 import { PASOS, cop, cuentaAtras, estrellasTexto, hora, metros } from './util.js';
 
@@ -14,7 +15,7 @@ export default function Detalle({ id }) {
 
   return (
     <>
-      <button className="btn sec chico" onClick={() => ir('#/')}>← Volver</button>
+      <button className="btn sec chico solo-ancho" onClick={() => ir('#/')}>← Volver</button>
       <div className="pila">
         {cargando ? <Cargando /> : error || !s ? (
           <div className="vacio">{error?.status === 404 || error?.status === 403 ? 'No encontramos esta solicitud o no tienes acceso a ella.' : `No pudimos cargar la solicitud. ${error?.message ?? ''}`}</div>
@@ -99,7 +100,7 @@ function Contenido({ s, yo, recargar }) {
 function Cuenta({ expiraEn }) {
   const ahora = useAhora(1000);
   const t = cuentaAtras(expiraEn, ahora);
-  return <div><span className="pequeno suave">{t ? `Tiempo restante: ${t}` : 'El plazo terminó'}</span></div>;
+  return <div><span className="cuenta"><Icono k="reloj" t={16} />{t ? `Tiempo restante: ${t}` : 'El plazo terminó'}</span></div>;
 }
 
 function Chat({ s }) {

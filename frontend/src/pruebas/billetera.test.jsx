@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, screen, waitFor } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { pintar, sesionComo, simularApi } from './apoyo.jsx';
 import Billetera, { referenciaDeRetorno, referenciaPendiente } from '../Billetera.jsx';
@@ -190,5 +190,20 @@ describe('referenciaDeRetorno', () => {
   it.each([[null, null], ['SL-abc_1', 'SL-abc_1'], ['a b', null], ['x'.repeat(41), null], ['<script>', null]])('%s → %s', (entrada, esperado) => {
     conRetorno(entrada === null ? null : encodeURIComponent(entrada));
     expect(referenciaDeRetorno()).toBe(esperado);
+  });
+});
+
+describe('movimientos', () => {
+  it('muestra las recargas como entradas y las comisiones como salidas', async () => {
+    simularApi({ 'GET /wallet': { ...BASE, movimientos: [
+      { id: 1, tipo: 'RECARGA', valorCop: 100000, saldoPosteriorCop: 100000, fecha: '2026-10-28T10:00:00Z' },
+      { id: 2, tipo: 'RETENCION', valorCop: 8500, saldoPosteriorCop: 91500, fecha: '2026-10-29T10:00:00Z' },
+    ] } });
+    pintar(<Billetera />);
+    const lista = await screen.findByRole('list');
+    expect(within(lista).getByText('Recarga')).toBeInTheDocument();
+    expect(within(lista).getByText(/^\+\$/)).toBeInTheDocument();
+    expect(within(lista).getByText('Comisión retenida')).toBeInTheDocument();
+    expect(within(lista).getByText(/^−\$/)).toBeInTheDocument();
   });
 });

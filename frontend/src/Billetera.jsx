@@ -2,7 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import { api, nuevaLlave } from './api.js';
 import { Cargando, useUI } from './ui.jsx';
 import { usePolling } from './hooks.js';
+import { Icono } from './iconos.jsx';
 import { TIPOS_MOV, cop, fecha, irA } from './util.js';
+
+const SUMAN = ['RECARGA', 'LIBERACION'];
 
 const CADA_MS = 3000;
 const INTENTOS_MAX = 20; // un minuto: si Wompi no confirma antes, el saldo se actualizará solo cuando llegue el evento
@@ -108,7 +111,7 @@ export default function Billetera() {
     <>
       {retorno && <ResultadoRecarga referencia={retorno} silenciosa={!desdeDireccion} alTerminar={() => recargar()} />}
       <div className="rejilla">
-        <div className="tarjeta estadistica"><div className="suave">Saldo disponible</div><div className="dinero">{cop(datos.saldoDisponibleCop)}</div>
+        <div className="tarjeta estadistica saldo"><div className="suave">Saldo disponible</div><div className="dinero">{cop(datos.saldoDisponibleCop)}</div>
           <div className="pequeno suave">Necesitas al menos {cop(datos.saldoMinimoCop ?? 40000)} para postularte</div></div>
         <div className="tarjeta estadistica"><div className="suave">Comisión retenida</div><div className="dinero">{cop(datos.saldoRetenidoCop)}</div>
           <div className="pequeno suave">Se cobra al finalizar y se libera si cancelan</div></div>
@@ -121,7 +124,7 @@ export default function Billetera() {
             <div className="fila">
               <div className="campo"><label htmlFor="rec-valor">Valor (COP)</label>
                 <input id="rec-valor" type="number" min={1000} max={1000000} step={1000} required value={valor} onChange={(e) => setValor(e.target.value)} /></div>
-              {datos.pagoDisponible && <button className="btn" type="submit" disabled={enviando}>{enviando ? 'Abriendo Wompi…' : 'Pagar con Wompi'}</button>}
+              {datos.pagoDisponible && <button className="btn acento" type="submit" disabled={enviando}>{enviando ? 'Abriendo Wompi…' : 'Pagar con Wompi'}</button>}
               {datos.recargaDemoDisponible && <button className="btn sec" type="button" onClick={recargarDemo}>Recarga de demostración</button>}
             </div>
           </>
@@ -130,12 +133,16 @@ export default function Billetera() {
       <div className="tarjeta">
         <h3>Últimos movimientos</h3>
         {datos.movimientos.length ? (
-          <div className="tabla-scroll"><table>
-            <thead><tr><th>Fecha</th><th>Movimiento</th><th>Valor</th><th>Saldo</th></tr></thead>
-            <tbody>{datos.movimientos.map((m) => (
-              <tr key={m.id}><td>{fecha(m.fecha)}</td><td>{TIPOS_MOV[m.tipo] || m.tipo}</td><td>{cop(m.valorCop)}</td><td>{cop(m.saldoPosteriorCop)}</td></tr>
-            ))}</tbody>
-          </table></div>
+          <ul className="movs">{datos.movimientos.map((m) => {
+            const suma = SUMAN.includes(m.tipo);
+            return (
+              <li key={m.id} className="mov">
+                <span className={'mov-marca ' + (suma ? 'suma' : 'resta')}><Icono k={suma ? 'subir' : 'bajar'} t={20} /></span>
+                <span className="mov-texto"><strong>{TIPOS_MOV[m.tipo] || m.tipo}</strong><span className="pequeno suave">{fecha(m.fecha)} · saldo {cop(m.saldoPosteriorCop)}</span></span>
+                <span className={'mov-monto ' + (suma ? 'suma' : 'resta')}>{suma ? '+' : '−'}{cop(m.valorCop)}</span>
+              </li>
+            );
+          })}</ul>
         ) : <div className="vacio">Sin movimientos todavía.</div>}
       </div>
     </>

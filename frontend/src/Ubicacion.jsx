@@ -4,20 +4,19 @@ import { useUI } from './ui.jsx';
 
 const Mapa = lazy(() => import('./Mapa.jsx')); // Leaflet pesa: se descarga solo cuando hay un mapa en pantalla
 
-/** Selector de ubicación: búsqueda de dirección, mapa para tocar, coordenadas editables y "Usar mi ubicación". */
-export default function Ubicacion({ valor, alCambiar, radioKm }) {
+/** Selector de ubicación: búsqueda de dirección, mapa para tocar y "Usar mi ubicación". Las coordenadas no se escriben: salen del mapa. */
+export default function Ubicacion({ valor, alCambiar, radioKm, compacto = false }) {
   const { avisar, intentar } = useUI();
   const [consulta, setConsulta] = useState('');
   const [resultados, setResultados] = useState(null); // null = aún no se busca
   const [buscando, setBuscando] = useState(false);
   const [elegido, setElegido] = useState(null);
-  const num = (v) => (v === '' || Number.isNaN(Number(v)) ? null : Number(v));
-
+  
   const usarMiUbicacion = () => {
     if (!navigator.geolocation) return avisar('Tu navegador no permite obtener la ubicación', 'error');
     navigator.geolocation.getCurrentPosition(
       (p) => { alCambiar({ lat: Number(p.coords.latitude.toFixed(6)), lng: Number(p.coords.longitude.toFixed(6)) }); avisar('Ubicación actualizada', 'ok'); },
-      () => avisar('No pudimos obtener tu ubicación; toca el mapa o escribe las coordenadas', 'error'),
+      () => avisar('No pudimos obtener tu ubicación; toca el mapa o busca la dirección', 'error'),
       { enableHighAccuracy: true, timeout: 8000 });
   };
   const valida = valor.lat != null && valor.lng != null;
@@ -42,9 +41,9 @@ export default function Ubicacion({ valor, alCambiar, radioKm }) {
   const nombreFijado = elegido && elegido.lat === valor.lat && elegido.lng === valor.lng ? elegido.nombre : null;
 
   return (
-    <div>
+    <div className={'ubicacion' + (compacto ? ' compacto' : '')}>
       <div className="campo">
-        <label htmlFor="u-buscar">Buscar dirección</label>
+        <label htmlFor="u-buscar">Dirección</label>
         <div className="buscar-direccion">
           <input id="u-buscar" type="search" maxLength={200} value={consulta} placeholder="Ej.: Carrera 5 con calle 6, Pamplona"
             onChange={(e) => setConsulta(e.target.value)}
@@ -69,24 +68,14 @@ export default function Ubicacion({ valor, alCambiar, radioKm }) {
         {nombreFijado && <p className="mapa-ayuda" role="status">Punto fijado en: {nombreFijado}</p>}
       </div>
       {valida && (
-        <Suspense fallback={<div className="mapa cargando">Cargando mapa…</div>}>
-          <Mapa punto={valor} radioKm={radioKm} alElegir={(p) => alCambiar({ lat: Number(p.lat.toFixed(6)), lng: Number(p.lng.toFixed(6)) })} />
-        </Suspense>
+        <div className="mapa-caja">
+          <Suspense fallback={<div className="mapa cargando">Cargando mapa…</div>}>
+            <Mapa punto={valor} radioKm={radioKm} alElegir={(p) => alCambiar({ lat: Number(p.lat.toFixed(6)), lng: Number(p.lng.toFixed(6)) })} />
+          </Suspense>
+          <span className="mapa-chip">Toca el mapa para mover el punto</span>
+        </div>
       )}
-      <p className="mapa-ayuda">Toca el mapa para mover el punto. Si el mapa no carga, escribe las coordenadas.</p>
-      <div className="dos">
-        <div className="campo">
-          <label htmlFor="u-lat">Latitud</label>
-          <input id="u-lat" type="number" step="any" min={-90} max={90} required value={valor.lat ?? ''}
-            onChange={(e) => alCambiar({ ...valor, lat: num(e.target.value) })} />
-        </div>
-        <div className="campo">
-          <label htmlFor="u-lng">Longitud</label>
-          <input id="u-lng" type="number" step="any" min={-180} max={180} required value={valor.lng ?? ''}
-            onChange={(e) => alCambiar({ ...valor, lng: num(e.target.value) })} />
-        </div>
-      </div>
-      <button type="button" className="btn sec chico" onClick={usarMiUbicacion}>Usar mi ubicación</button>
+      <button type="button" className="enlace pequeno" onClick={usarMiUbicacion}>Usar mi ubicación</button>
     </div>
   );
 }
