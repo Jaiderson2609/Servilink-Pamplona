@@ -83,7 +83,7 @@ describe('hogar', () => {
       'POST /service-requests': [201, { ...base, id: 11, estado: 'E01' }],
     });
     pintar(<Hogar />);
-    await userEvent.type(await screen.findByLabelText('Descripción'), 'Cambiar un tomacorriente roto');
+    await userEvent.type(await screen.findByLabelText('Cuéntanos el problema'), 'Cambiar un tomacorriente roto');
     await userEvent.click(screen.getByRole('button', { name: 'Publicar solicitud' }));
     await waitFor(() => expect(llamadas.some((l) => l.metodo === 'POST' && l.ruta === '/service-requests')).toBe(true));
     const l = llamadas.find((x) => x.metodo === 'POST' && x.ruta === '/service-requests');
@@ -96,7 +96,7 @@ describe('hogar', () => {
     sesionComo(HOGAR);
     const llamadas = simularApi({ 'GET /service-requests/mine': [], 'GET /trades': [{ id: 2, nombre: 'Electricista' }] });
     pintar(<Hogar />);
-    await userEvent.type(await screen.findByLabelText('Descripción'), 'corto');
+    await userEvent.type(await screen.findByLabelText('Cuéntanos el problema'), 'corto');
     await userEvent.click(screen.getByRole('button', { name: 'Publicar solicitud' }));
     expect(llamadas.some((l) => l.metodo === 'POST')).toBe(false); // la validación del navegador lo detiene
   });

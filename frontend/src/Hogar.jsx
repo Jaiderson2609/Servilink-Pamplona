@@ -4,7 +4,7 @@ import { useSesion } from './sesion.jsx';
 import { Cargando, useUI } from './ui.jsx';
 import { usePolling, ir } from './hooks.js';
 import { ACTIVAS, PAMPLONA, nombrePila } from './util.js';
-import { ListaSolicitudes } from './Solicitudes.jsx';
+import { ListaFiltrada, ListaSolicitudes } from './Solicitudes.jsx';
 import Ubicacion from './Ubicacion.jsx';
 import { pestanaHogar } from './menus.js';
 
@@ -22,17 +22,21 @@ export default function Hogar({ tab }) {
   if (pestanaHogar(tab) === 'solicitudes') {
     return (
       <>
-        <h1>Mis solicitudes</h1>
-        <p className="suave">Sigue el estado de lo que has publicado.</p>
-        <ListaSolicitudes lista={datos.mias} vacio="Aún no tienes solicitudes." />
+        <div className="solo-ancho">
+          <h1>Mis solicitudes</h1>
+          <p className="suave">Sigue el estado de lo que has publicado.</p>
+        </div>
+        <ListaFiltrada lista={datos.mias} vacio="Aún no tienes solicitudes." />
       </>
     );
   }
 
   return (
     <>
-      <h1>Hola, {nombrePila(yo.nombre)}</h1>
-      <p className="suave">Cuéntanos qué necesitas y los técnicos de Pamplona te enviarán ofertas.</p>
+      <div className="solo-ancho">
+        <h1>Hola, {nombrePila(yo.nombre)}</h1>
+        <p className="suave">Cuéntanos qué necesitas y los técnicos de Pamplona te enviarán ofertas.</p>
+      </div>
       {activa ? (
         <div className="tarjeta">
           <h2>Tu solicitud activa</h2>
@@ -69,17 +73,19 @@ function NuevaSolicitud({ oficios }) {
   };
 
   return (
-    <form className="tarjeta" onSubmit={enviar}>
-      <h2>Nueva solicitud</h2>
-      <div className="campo"><label htmlFor="n-oficio">¿Qué necesitas?</label>
-        <select id="n-oficio" required value={oficioId} onChange={(e) => setOficioId(e.target.value)}>
-          {oficios.map((o) => <option key={o.id} value={o.id}>{o.nombre}</option>)}
-        </select></div>
-      <div className="campo"><label htmlFor="n-desc">Descripción</label>
+    <form className="tarjeta formulario" onSubmit={enviar}>
+      <h2 className="solo-ancho">Nueva solicitud</h2>
+      <div className="campo"><span id="n-oficio-etq" className="etiqueta">¿Qué oficio necesitas?</span>
+        <div className="chips-oficio" role="radiogroup" aria-labelledby="n-oficio-etq">
+          {oficios.map((o) => (
+            <button key={o.id} type="button" role="radio" aria-checked={Number(oficioId) === o.id} className="chip-oficio" onClick={() => setOficioId(o.id)}>{o.nombre}</button>
+          ))}
+        </div></div>
+      <div className="campo"><label htmlFor="n-desc">Cuéntanos el problema</label>
         <textarea id="n-desc" minLength={10} maxLength={500} required value={descripcion} onChange={(e) => setDescripcion(e.target.value)}
           placeholder="Cuéntale al técnico qué pasa y qué necesitas" />
         <div className="ayuda"><span className="pequeno suave">{descripcion.length} / 500</span> · mínimo 10 caracteres</div></div>
-      <div className="campo"><label>¿Dónde?</label><Ubicacion valor={ubicacion} alCambiar={setUbicacion} /></div>
+      <div className="campo"><Ubicacion valor={ubicacion} alCambiar={setUbicacion} compacto /></div>
       <p className="pequeno suave">Los técnicos tienen 10 minutos para ofertar. Después tendrás 5 minutos para elegir.</p>
       <button className="btn acento ancho" type="submit" disabled={enviando}>Publicar solicitud</button>
     </form>

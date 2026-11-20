@@ -2,53 +2,30 @@ import { useEffect, useState } from 'react';
 import { api } from './api.js';
 import { useSesion } from './sesion.jsx';
 import { Cargando, useUI } from './ui.jsx';
-import { ir, usePolling } from './hooks.js';
+import { ir, useAngosto, usePolling } from './hooks.js';
 import { PAMPLONA, metros, nombrePila } from './util.js';
 import { ListaSolicitudes } from './Solicitudes.jsx';
 import Ubicacion from './Ubicacion.jsx';
 import Billetera, { referenciaDeRetorno } from './Billetera.jsx';
 import { pestanaTecnico } from './menus.js';
+import Disponibilidad from './Disponibilidad.jsx';
 
 export default function Tecnico({ tab }) {
   const { yo } = useSesion();
   const retorno = referenciaDeRetorno();
   // Wompi devuelve al técnico a la raíz del sitio con ?recarga=…: se lo lleva a la billetera a ver el resultado.
   const activa = pestanaTecnico(tab);
+  const angosto = useAngosto(); // en el celular la disponibilidad vive en la barra superior
   useEffect(() => { if (retorno && tab !== 'billetera') ir('#/t/billetera'); }, [retorno, tab]);
   return (
     <>
-      <div className="fila entre"><h1>Hola, {nombrePila(yo.nombre)}</h1><Disponibilidad /></div>
+      <div className="fila entre solo-ancho"><h1>Hola, {nombrePila(yo.nombre)}</h1>{!angosto && <Disponibilidad />}</div>
       {activa === 'oportunidades' && <Oportunidades />}
       {activa === 'servicios' && <Servicios />}
       {activa === 'billetera' && <Billetera />}
       {activa === 'zona' && <Zona />}
       {activa === 'verificacion' && <Verificacion />}
     </>
-  );
-}
-
-const ESTADOS = { AVAILABLE: 'Disponible', BUSY: 'Ocupado', OFFLINE: 'No disponible' };
-
-/** RF-019: solo un técnico disponible ve solicitudes y puede postularse. El interruptor alterna Disponible / No disponible. */
-function Disponibilidad() {
-  const { intentar, avisar } = useUI();
-  const { datos, recargar } = usePolling(() => api('/technicians/me/availability'), 0, []);
-  const poner = async (estado) => {
-    const r = await intentar(() => api('/technicians/me/availability', { metodo: 'PATCH', json: { estado } }));
-    if (r) { avisar('Disponibilidad actualizada', 'ok'); recargar(); }
-  };
-  if (!datos) return null;
-  const activo = datos.estado === 'AVAILABLE';
-  return (
-    <div className="disp">
-      <div className="disp-texto">
-        <span id="t-disp-etq" className="disp-titulo">Mi disponibilidad</span>
-        <span className="pequeno suave">{ESTADOS[datos.estado] || datos.estado}{activo ? ' · recibes avisos de nuevas solicitudes' : ''}</span>
-        {activo && <button type="button" className="enlace pequeno" onClick={() => poner('BUSY')}>Marcar como ocupado</button>}
-      </div>
-      <button type="button" role="switch" aria-checked={activo} aria-labelledby="t-disp-etq" className="interruptor"
-        onClick={() => poner(activo ? 'OFFLINE' : 'AVAILABLE')}><span className="perilla" /></button>
-    </div>
   );
 }
 
@@ -71,7 +48,7 @@ function Oportunidades() {
       {datos.zona
         ? <p className="suave">Mostrando solicitudes a menos de {datos.zona.radioKm} km de tu zona de trabajo, de la más cercana a la más lejana.</p>
         : <div className="tarjeta"><strong>Aún no defines tu zona de trabajo. </strong>Mientras tanto ves todas las solicitudes abiertas. <button className="btn chico" onClick={() => ir('#/t/zona')}>Definir zona</button></div>}
-      <ListaSolicitudes lista={datos.abiertas} vacio="No hay solicitudes abiertas dentro de tu zona por ahora. Esta lista se actualiza sola." extra={(s) => metros(s.distanciaM)} />
+      <ListaSolicitudes lista={datos.abiertas} vacio="No hay solicitudes abiertas dentro de tu zona por ahora. Esta lista se actualiza sola." extra={(s) => metros(s.distanciaM)} oferta />
     </>
   );
 }

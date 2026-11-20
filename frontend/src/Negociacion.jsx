@@ -59,9 +59,12 @@ export function OfertasHogar({ s, recargar }) {
       <h2>Ofertas ({activas.length})</h2>
       {activas.length ? (
         <ul className="lista-sol">{activas.map((o) => (
-          <li key={o.id} className="tarjeta">
-            <div className="fila entre"><strong>{o.tecnico}</strong><span className="dinero">{cop(o.precioCop)}</span></div>
-            <div className="pequeno suave">{estrellasTexto(o.calificacionPromedio, o.calificaciones)}</div>
+          <li key={o.id} className="tarjeta oferta">
+            <div className="oferta-cab">
+              <span className="avatar-of" aria-hidden="true">{(o.tecnico || '?').trim().charAt(0).toUpperCase()}</span>
+              <div className="oferta-quien"><strong>{o.tecnico}</strong><span className="pequeno suave">{estrellasTexto(o.calificacionPromedio, o.calificaciones)}</span></div>
+              <span className="dinero">{cop(o.precioCop)}</span>
+            </div>
             {o.mensaje && <p>“{o.mensaje}”</p>}
             <Historial ofertas={o.ofertas} yoAutor="HOGAR" />
             {pendiente(o) && <p className="suave">Enviaste una contraoferta de {cop(pendiente(o).montoCop)}. Esperando la respuesta del técnico.</p>}

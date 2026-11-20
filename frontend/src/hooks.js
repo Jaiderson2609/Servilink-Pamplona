@@ -92,3 +92,19 @@ export function useAhora(ms = 1000) {
   useEffect(() => { const t = setInterval(() => setAhora(Date.now()), ms); return () => clearInterval(t); }, [ms]);
   return ahora;
 }
+
+/** Verdadero en pantallas angostas (celular): ahí la navegación es la barra inferior y no el panel lateral. */
+export function useAngosto(max = 860) {
+  const consulta = `(max-width: ${max}px)`;
+  const hay = typeof window.matchMedia === 'function';
+  const [angosto, setAngosto] = useState(() => hay && window.matchMedia(consulta).matches);
+  useEffect(() => {
+    if (!hay) return undefined;
+    const m = window.matchMedia(consulta);
+    const al = () => setAngosto(m.matches);
+    al();
+    m.addEventListener('change', al);
+    return () => m.removeEventListener('change', al);
+  }, [consulta, hay]);
+  return angosto;
+}
