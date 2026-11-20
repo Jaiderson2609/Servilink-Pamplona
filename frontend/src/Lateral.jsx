@@ -1,3 +1,4 @@
+import AvisosPush from './AvisosPush.jsx';
 import { Icono } from './iconos.jsx';
 import { ROLES } from './util.js';
 
@@ -32,6 +33,7 @@ export default function Lateral({ yo, base, items, activa, salir }) {
             <span className="lat-rol">{ROLES[yo.rol] || yo.rol}</span>
           </span>
         </div>
+        <AvisosPush variante="lateral" />
         <button type="button" className="lat-salir" onClick={() => salir()}>Salir</button>
       </div>
     </aside>

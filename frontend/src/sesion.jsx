@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { api, alSesionRenovar, alSesionVencida, setToken } from './api.js';
 import { detenerEventos, iniciarEventos } from './eventos.js';
+import { activarPush, quitarPush } from './push.js';
 
 const Ctx = createContext(null);
 export const useSesion = () => useContext(Ctx);
@@ -59,6 +60,7 @@ export function SesionProvider({ children, alVencer }) {
   }, []);
 
   const salir = useCallback((mensaje) => {
+    quitarPush(); // este dispositivo deja de recibir los avisos de la cuenta que sale
     api('/auth/logout', { metodo: 'POST' }).catch(() => {}); // revoca la renovación en el servidor; si falla, igual se sale
     guardar(null);
     if (mensaje && alVencer) alVencer(mensaje);
@@ -88,6 +90,10 @@ export function SesionProvider({ children, alVencer }) {
     if (token) iniciarEventos(token); else detenerEventos();
     return detenerEventos;
   }, [token]);
+
+  // Si la persona ya permitió los avisos en este navegador, se registra el dispositivo con la cuenta que entró (sin preguntar nada).
+  const usuarioId = sesion?.yo?.id;
+  useEffect(() => { if (usuarioId) activarPush(); }, [usuarioId]);
 
   const valor = useMemo(() => ({ yo: sesion?.yo ?? null, restaurando, entrar, entrarConGoogle, registrar, salir }),
     [sesion, restaurando, entrar, entrarConGoogle, registrar, salir]);

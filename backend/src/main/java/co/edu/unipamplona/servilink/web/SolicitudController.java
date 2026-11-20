@@ -39,6 +39,7 @@ public class SolicitudController {
     public ResponseEntity<SolicitudService.Vista> crear(@Valid @RequestBody Peticiones.SolicitudCrear c,
                                                         @AuthenticationPrincipal Jwt jwt) {
         var v = solicitudes.crear(id(jwt), c.oficioId(), c.descripcion(), c.ubicacion().lat(), c.ubicacion().lng());
+        notificaciones.enSegundoPlano(() -> notificaciones.avisarNuevaSolicitud(v.id())); // push a los técnicos cercanos
         return ResponseEntity.created(URI.create("/api/v1/service-requests/" + v.id())).body(v);
     }
 
@@ -61,6 +62,7 @@ public class SolicitudController {
     public ResponseEntity<SolicitudService.VistaPostulacion> postular(@PathVariable Long solicitudId,
             @Valid @RequestBody Peticiones.PostulacionCrear p, @AuthenticationPrincipal Jwt jwt) {
         var v = solicitudes.postular(id(jwt), solicitudId, p.precioCop(), p.mensaje());
+        notificaciones.enSegundoPlano(() -> notificaciones.avisarPostulacion(solicitudId, v.tecnicoId())); // push al hogar
         return ResponseEntity.created(URI.create("/api/v1/applications/" + v.id()))
                 .body(v);
     }

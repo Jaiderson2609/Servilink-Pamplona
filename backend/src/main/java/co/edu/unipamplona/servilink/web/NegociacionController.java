@@ -3,6 +3,7 @@ package co.edu.unipamplona.servilink.web;
 import co.edu.unipamplona.servilink.aplicacion.Codigo;
 import co.edu.unipamplona.servilink.aplicacion.ErrorNegocio;
 import co.edu.unipamplona.servilink.aplicacion.NegociacionService;
+import co.edu.unipamplona.servilink.aplicacion.NotificacionService;
 import co.edu.unipamplona.servilink.aplicacion.SolicitudService;
 import co.edu.unipamplona.servilink.dominio.Usuario;
 import co.edu.unipamplona.servilink.repositorio.UsuarioRepositorio;
@@ -23,11 +24,14 @@ public class NegociacionController {
     private final NegociacionService negociacion;
     private final SolicitudService solicitudes;
     private final UsuarioRepositorio usuarios;
+    private final NotificacionService notificaciones;
 
-    public NegociacionController(NegociacionService negociacion, SolicitudService solicitudes, UsuarioRepositorio usuarios) {
+    public NegociacionController(NegociacionService negociacion, SolicitudService solicitudes, UsuarioRepositorio usuarios,
+                                 NotificacionService notificaciones) {
         this.negociacion = negociacion;
         this.solicitudes = solicitudes;
         this.usuarios = usuarios;
+        this.notificaciones = notificaciones;
     }
 
     private static Long id(Jwt jwt) { return Long.valueOf(jwt.getSubject()); }
@@ -35,7 +39,9 @@ public class NegociacionController {
     @PostMapping("/applications/{applicationId}/offers")
     public ResponseEntity<SolicitudService.VistaOferta> ofertar(@PathVariable Long applicationId,
             @Valid @RequestBody Peticiones.OfertaCrear o, @AuthenticationPrincipal Jwt jwt) {
-        var v = negociacion.ofertar(id(jwt), jwt.getClaimAsString("rol"), applicationId, o.montoCop());
+        String rol = jwt.getClaimAsString("rol");
+        var v = negociacion.ofertar(id(jwt), rol, applicationId, o.montoCop());
+        notificaciones.enSegundoPlano(() -> notificaciones.avisarOferta(applicationId, "HOGAR".equals(rol), v.id())); // push a la contraparte
         return ResponseEntity.created(URI.create("/api/v1/offers/" + v.id())).body(v);
     }
 

@@ -60,6 +60,7 @@ a { color: var(--verde); }
 .lat-nombre { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lat-rol { font-size: .85rem; color: #cfe9e5; }
 .lat-salir { height: 40px; border: 1.5px solid rgba(255, 255, 255, .55); border-radius: 10px; background: transparent; color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
+.lat-aviso { font-size: 13px; text-align: center; color: rgba(255, 255, 255, .85); }
 .lat-salir:hover { background: rgba(255, 255, 255, .14); }
 .lateral a:focus-visible, .lateral button:focus-visible { outline-color: #ffe08a; }
 
