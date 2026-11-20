@@ -16,4 +16,6 @@ public interface NotificacionRepositorio extends JpaRepository<NotificacionPendi
 
     @Query("select n.id from NotificacionPendiente n where n.estado = 'PENDIENTE' order by n.id")
     List<Long> idsPendientes();
+
+    boolean existsByClave(String clave);
 }

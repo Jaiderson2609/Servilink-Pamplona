@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from './api.js';
+import AvisosPush from './AvisosPush.jsx';
 import { Icono } from './iconos.jsx';
 import { ROLES } from './util.js';
 import { ir, usePolling } from './hooks.js';
@@ -58,6 +59,7 @@ export function BarraInferior({ yo, menu, salir }) {
               <span className="mov-fila-texto"><span className="mov-fila-titulo">{texto}</span>{sub && <span className="mov-fila-sub">{sub}</span>}</span>
             </a>
           ))}
+          <AvisosPush />
           <button type="button" className="mov-fila peligro" onClick={() => salir()}>
             <span className="mov-fila-icono"><Icono k="salir" t={22} /></span>
             <span className="mov-fila-texto"><span className="mov-fila-titulo">Salir</span></span>

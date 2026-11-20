@@ -45,6 +45,9 @@ public final class Peticiones {
     public record Disponibilidad(
             @NotNull(message = "estado es obligatorio") @Pattern(regexp = "AVAILABLE|BUSY|OFFLINE", message = "estado debe ser AVAILABLE, BUSY u OFFLINE") String estado) {}
 
+    public record TokenPush(
+            @NotBlank(message = "token es obligatorio") @Size(max = 4096, message = "token es demasiado largo") String token) {}
+
     public record Cancelacion(@Size(max = 200, message = "motivo admite hasta 200 caracteres") String motivo) {}
 
     public record Recarga(

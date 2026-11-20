@@ -54,11 +54,15 @@ public class SeguridadConfig {
     @Bean
     SecurityFilterChain cadena(HttpSecurity http, org.springframework.jdbc.core.JdbcTemplate jdbc, java.time.Clock reloj,
             co.edu.unipamplona.servilink.aplicacion.AlmacenImagenes almacen,
-            co.edu.unipamplona.servilink.aplicacion.VerificadorGoogle google) throws Exception {
+            co.edu.unipamplona.servilink.aplicacion.VerificadorGoogle google,
+            co.edu.unipamplona.servilink.infraestructura.CuentaServicioGoogle firebase) throws Exception {
         // Si Cloudinary está configurado, el navegador puede mostrar sus imágenes y subirles directamente.
         String imagenes = almacen.disponible() ? " " + almacen.origenEntrega() : "";
         boolean g = google.disponible();
-        String conexiones = (almacen.disponible() ? " " + almacen.origenSubida() : "") + (g ? " https://accounts.google.com/gsi/" : "");
+        // Los avisos push (Firebase) registran el navegador en estos tres servicios de Google; solo se abren si hay cuenta de servicio.
+        String push = firebase.habilitada()
+                ? " https://fcmregistrations.googleapis.com https://firebaseinstallations.googleapis.com https://fcm.googleapis.com" : "";
+        String conexiones = (almacen.disponible() ? " " + almacen.origenSubida() : "") + (g ? " https://accounts.google.com/gsi/" : "") + push;
         // El botón de Google Identity Services carga su script, su estilo y su marco desde accounts.google.com.
         String scripts = g ? " https://accounts.google.com/gsi/client" : "";
         String estilos = g ? " https://accounts.google.com/gsi/style" : "";
@@ -78,7 +82,7 @@ public class SeguridadConfig {
                         // Wompi no tiene JWT: la autenticidad del evento la da su firma, que verifica el controlador.
                         .requestMatchers(HttpMethod.POST, "/api/v1/webhooks/wompi").permitAll()
                         // La plataforma web (React compilado: página, assets, manifiesto y service worker) es pública; todo lo sensible vive detrás de /api.
-                        .requestMatchers(HttpMethod.GET, "/", "/index.html", "/favicon.svg", "/manifest.webmanifest", "/sw.js",
+                        .requestMatchers(HttpMethod.GET, "/", "/index.html", "/favicon.svg", "/manifest.webmanifest", "/sw.js", "/firebase-messaging-sw.js",
                                 "/assets/**", "/icons/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/service-requests").hasRole("HOGAR")
                         .requestMatchers(HttpMethod.POST, "/api/v1/uploads/signature").hasRole("HOGAR")
