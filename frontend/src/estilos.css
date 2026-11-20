@@ -157,6 +157,9 @@ th { font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; color: 
 .tabla-scroll { overflow-x: auto; }
 
 .fotos { display: flex; gap: .6rem; flex-wrap: wrap; }
+.foto-elegida { position: relative; }
+.foto-quitar { position: absolute; top: -8px; right: -8px; width: 28px; height: 28px; border-radius: 50%; border: 0; background: #12302d; color: #fff; font-size: 18px; line-height: 1; cursor: pointer; }
+.fotos { margin-bottom: .5rem; }
 .foto { width: 112px; height: 112px; object-fit: cover; border-radius: 10px; border: 1px solid var(--linea); background: var(--linea); }
 
 .chat { border: 1px solid var(--linea); border-radius: 12px; padding: .6rem; max-height: 300px; min-height: 90px; overflow-y: auto; background: var(--fondo); display: flex; flex-direction: column; gap: .4rem; }

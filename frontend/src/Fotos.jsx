@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from './api.js';
 import { useUI } from './ui.jsx';
-
-const MAX_BYTES = 2 * 1024 * 1024;
+import { MAX_BYTES, prepararFoto } from './imagenes.js';
 
 /**
  * Sube la foto directo a Cloudinary con la firma del servidor y luego la registra en el API.
@@ -38,6 +37,14 @@ async function subirALaNube(solicitudId, archivo) {
   });
 }
 
+/** Sube una foto a la solicitud: a la nube si está disponible y, si no, por el API. Lanza si el servidor la rechaza. */
+export async function subirFoto(solicitudId, archivo) {
+  const nube = await subirALaNube(solicitudId, archivo);
+  if (nube) return nube;
+  const form = new FormData(); form.append('foto', archivo);
+  return api(`/service-requests/${solicitudId}/photos`, { metodo: 'POST', form });
+}
+
 export default function Fotos({ s, esHogar, recargar }) {
   const { avisar, intentar } = useUI();
   const [fotos, setFotos] = useState(null);
@@ -68,15 +75,11 @@ export default function Fotos({ s, esHogar, recargar }) {
   if (!fotos.length && !puede) return null;
 
   const subir = async (ev) => {
-    const f = ev.target.files[0];
-    if (!f) return;
+    const elegida = ev.target.files[0];
+    if (!elegida) return;
+    const f = await prepararFoto(elegida);
     if (f.size > MAX_BYTES) { avisar('Cada foto puede pesar hasta 2 MB', 'error'); ev.target.value = ''; return; }
-    const r = await intentar(async () => {
-      const nube = await subirALaNube(s.id, f);
-      if (nube) return nube;
-      const form = new FormData(); form.append('foto', f);
-      return api(`/service-requests/${s.id}/photos`, { metodo: 'POST', form });
-    });
+    const r = await intentar(() => subirFoto(s.id, f));
     ev.target.value = '';
     if (r) { avisar('Foto agregada', 'ok'); setVersion((v) => v + 1); recargar(); }
   };
