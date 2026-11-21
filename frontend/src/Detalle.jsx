@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { api, nuevaLlave } from './api.js';
 import { useSesion } from './sesion.jsx';
 import { Cargando, Insignia, useUI } from './ui.jsx';
@@ -8,6 +8,8 @@ import Fotos from './Fotos.jsx';
 import { Icono } from './iconos.jsx';
 import { OfertasHogar, PanelTecnico } from './Negociacion.jsx';
 import { PASOS, cop, cuentaAtras, estrellasTexto, hora, metros } from './util.js';
+
+const Mapa = lazy(() => import('./Mapa.jsx')); // Leaflet pesa: se descarga solo cuando hay un mapa en pantalla
 
 export default function Detalle({ id }) {
   const { yo } = useSesion();
@@ -76,6 +78,7 @@ function Contenido({ s, yo, recargar }) {
       </div>
 
       <Fotos s={s} esHogar={esHogar} recargar={recargar} />
+      {yo.rol === 'TECNICO' && s.ubicacion && <UbicacionServicio u={s.ubicacion} />}
       {esHogar && activa && <OfertasHogar s={s} recargar={recargar} />}
       {yo.rol === 'TECNICO' && !esTecnicoAsignado && activa && <PanelTecnico s={s} recargar={recargar} />}
 
@@ -94,6 +97,27 @@ function Contenido({ s, yo, recargar }) {
       {s.tecnicoId != null && (esHogar || esTecnicoAsignado) && <Chat s={s} />}
       {s.estado === 'E05' && (esHogar || esTecnicoAsignado) && <Calificar s={s} yo={yo} />}
     </>
+  );
+}
+
+/** Dónde es el servicio: zona aproximada antes de ser elegido; dirección exacta y ruta cuando ya es tuyo. */
+function UbicacionServicio({ u }) {
+  const punto = { lat: u.lat, lng: u.lng };
+  return (
+    <div className="tarjeta">
+      <h2>{u.exacta ? 'Dirección del servicio' : 'Zona aproximada'}</h2>
+      <div className="mapa-caja">
+        <Suspense fallback={<div className="mapa cargando">Cargando mapa…</div>}>
+          <Mapa punto={punto} aproximada={!u.exacta} />
+        </Suspense>
+      </div>
+      {u.exacta ? (
+        <>
+          <a className="btn sec" target="_blank" rel="noopener noreferrer"
+            href={`https://www.google.com/maps/search/?api=1&query=${u.lat},${u.lng}`}>Abrir en Google Maps</a>
+        </>
+      ) : <p className="suave">La dirección exacta se revela solo si el hogar te elige.</p>}
+    </div>
   );
 }
 

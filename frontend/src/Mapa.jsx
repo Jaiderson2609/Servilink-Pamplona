@@ -15,16 +15,17 @@ function Centrar({ punto }) {
  * Mapa de OpenStreetMap con un punto que se mueve tocando el mapa. Si `radioKm` viene, dibuja el radio de trabajo.
  * La atribución es obligatoria por la licencia de OpenStreetMap.
  */
-export default function Mapa({ punto, alElegir, radioKm }) {
+export default function Mapa({ punto, alElegir, radioKm, aproximada = false }) {
   return (
     <div className="mapa">
       <MapContainer center={[punto.lat, punto.lng]} zoom={radioKm && radioKm > 8 ? 10 : 14} scrollWheelZoom={false}
         attributionControl>
         {/* OpenStreetMap exige el origen de la plataforma en el encabezado Referer; el resto del sitio sigue sin enviarlo. */}
         <TileLayer attribution="© colaboradores de OpenStreetMap" url="https://tile.openstreetmap.org/{z}/{x}/{y}.png" maxZoom={19} referrerPolicy="origin" />
+        {aproximada ? <Circle center={[punto.lat, punto.lng]} radius={500} pathOptions={{ color: '#0f5e57', weight: 2, fillOpacity: 0.15 }} /> : null}
         {radioKm ? <Circle center={[punto.lat, punto.lng]} radius={radioKm * 1000} pathOptions={{ color: '#0f5e57', weight: 2, fillOpacity: 0.08 }} /> : null}
-        <CircleMarker center={[punto.lat, punto.lng]} radius={9} pathOptions={{ color: '#fff', weight: 3, fillColor: '#0f5e57', fillOpacity: 1 }} />
-        <Clics alElegir={alElegir} />
+        {aproximada ? null : <CircleMarker center={[punto.lat, punto.lng]} radius={9} pathOptions={{ color: '#fff', weight: 3, fillColor: '#0f5e57', fillOpacity: 1 }} />}
+        {alElegir ? <Clics alElegir={alElegir} /> : null}
         <Centrar punto={punto} />
       </MapContainer>
     </div>
