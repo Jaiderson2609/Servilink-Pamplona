@@ -140,7 +140,11 @@ public class SolicitudService {
         boolean esHogar = s.getHogarId().equals(usuarioId);
         boolean esTecnico = usuarioId.equals(s.getTecnicoId())
                 || (!"HOGAR".equals(rol) && postulaciones.existsBySolicitudIdAndTecnicoId(solicitudId, usuarioId));
-        if (!esHogar && !esTecnico) {
+        // Un técnico verificado puede abrir una solicitud abierta antes de postularse: es donde cotiza (RF-021).
+        boolean abiertaParaTecnico = "TECNICO".equals(rol)
+                && EstadoSolicitud.esUnoDe(s.getEstado(), EstadoSolicitud.E01, EstadoSolicitud.E02)
+                && usuarios.findById(usuarioId).map(u -> "APROBADA".equals(u.getVerificacion())).orElse(false);
+        if (!esHogar && !esTecnico && !abiertaParaTecnico) {
             throw new ErrorNegocio(Codigo.FORBIDDEN, "No participas en esta solicitud");
         }
         return vista(s, usuarioId, rol);
