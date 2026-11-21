@@ -60,7 +60,8 @@ export function usePolling(traer, ms, claves = [], escuchar = null) {
       if (firma !== ultimo.current) { ultimo.current = firma; setEstado({ datos: d, error: null, cargando: false }); }
       else setEstado((e) => (e.cargando || e.error ? { datos: d, error: null, cargando: false } : e));
     } catch (error) {
-      setEstado((e) => ({ ...e, error, cargando: false }));
+      // Si ya hay datos en pantalla, un fallo pasajero no los reemplaza por un error: el próximo sondeo reintenta.
+      setEstado((e) => (e.datos !== undefined ? e : { ...e, error, cargando: false }));
     }
   }, []);
 
@@ -79,7 +80,15 @@ export function usePolling(traer, ms, claves = [], escuchar = null) {
       if (!vivo || pendiente || !(e.tipo === 'reconectado' || escucharRef.current?.(e))) return;
       pendiente = setTimeout(() => { pendiente = null; if (vivo) recargar(); }, AGRUPAR_MS);
     }) : null;
-    return () => { vivo = false; if (t) clearInterval(t); if (baja) baja(); if (pendiente) clearTimeout(pendiente); };
+    // Al volver a la pantalla (o recuperar la red) se actualiza al momento: en segundo plano el celular pausa las conexiones.
+    const alVolver = () => { if (vivo && (!document.hidden)) recargar(); };
+    document.addEventListener('visibilitychange', alVolver);
+    window.addEventListener('online', alVolver);
+    return () => {
+      vivo = false; if (t) clearInterval(t); if (baja) baja(); if (pendiente) clearTimeout(pendiente);
+      document.removeEventListener('visibilitychange', alVolver);
+      window.removeEventListener('online', alVolver);
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, claves);
 
