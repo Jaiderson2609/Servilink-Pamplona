@@ -60,7 +60,7 @@ public class NegociacionService {
             ultima.setEstado("RECHAZADA");
             pos.setPrecio(monto);
         }
-        eventos.solicitud(sol);
+        eventos.solicitud(sol, pos.getTecnicoId());
         return vista(nueva);
     }
 
@@ -86,7 +86,7 @@ public class NegociacionService {
         exigirNegociable(sol, pos);
         oferta.setEstado("ACEPTADA");
         pos.setPrecio(oferta.getMonto());
-        eventos.solicitud(sol);
+        eventos.solicitud(sol, pos.getTecnicoId());
         return vista(oferta);
     }
 
@@ -106,7 +106,7 @@ public class NegociacionService {
             throw new ErrorNegocio(Codigo.INVALID_STATE_TRANSITION, "La postulación ya no se puede retirar");
         }
         pos.setEstado("RETIRADA");
-        eventos.solicitud(sol);
+        eventos.solicitud(sol, pos.getTecnicoId());
         return pos.getEstado();
     }
 

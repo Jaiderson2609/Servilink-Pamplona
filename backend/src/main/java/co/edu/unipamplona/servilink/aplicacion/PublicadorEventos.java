@@ -27,6 +27,15 @@ public class PublicadorEventos {
         publicador.publishEvent(new SolicitudCambio(s.getId(), s.getHogarId(), s.getTecnicoId()));
     }
 
+    /**
+     * Igual que {@link #solicitud(Solicitud)}, pero avisa también al técnico postulado: mientras el hogar no elige,
+     * la solicitud no tiene técnico asignado y su contraoferta no le llegaría en tiempo real.
+     */
+    public void solicitud(Solicitud s, Long tecnicoPostulado) {
+        publicador.publishEvent(new SolicitudCambio(s.getId(), s.getHogarId(),
+                s.getTecnicoId() != null ? s.getTecnicoId() : tecnicoPostulado));
+    }
+
     public void mensaje(Solicitud s) {
         publicador.publishEvent(new MensajeNuevo(s.getId(), s.getHogarId(), s.getTecnicoId()));
     }
