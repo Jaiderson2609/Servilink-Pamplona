@@ -63,6 +63,20 @@ describe('canal de eventos en tiempo real', () => {
     expect(s.enviados.filter((m) => m === '{"tipo":"ping"}')).toHaveLength(2);
   });
 
+  it('si el canal queda abierto pero sin responder por un minuto, lo cierra y reconecta', () => {
+    const s = conectarYAutenticar();
+    vi.advanceTimersByTime(75000); // ni un pong en 75 s
+    expect(s.readyState).toBe(3);
+    vi.advanceTimersByTime(2000);
+    expect(WebSocketFalso.instancias.length).toBeGreaterThan(1);
+  });
+
+  it('con pongs a tiempo el canal sigue abierto', () => {
+    const s = conectarYAutenticar();
+    for (let i = 0; i < 6; i++) { vi.advanceTimersByTime(25000); s.recibir({ tipo: 'pong' }); }
+    expect(s.readyState).toBe(1);
+  });
+
   it('si se cae reconecta con espera creciente y, al volver, emite "reconectado"', () => {
     const vistos = [];
     suscribirEventos((e) => vistos.push(e.tipo));

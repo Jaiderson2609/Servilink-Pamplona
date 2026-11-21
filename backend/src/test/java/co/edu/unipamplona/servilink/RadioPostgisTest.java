@@ -85,6 +85,8 @@ class RadioPostgisTest extends PruebaApi {
         long pos = ((Number) campo(enviar(tecnico, "/api/v1/service-requests/" + asignada + "/applications", "{\"precioCop\":20000}"), "$.id")).longValue();
         String hogarA = campo(enviar(null, "/api/v1/auth/login", "{\"correo\":\"a@correo.co\",\"clave\":\"clave-segura-1\"}"), "$.accessToken");
         enviar(hogarA, "/api/v1/applications/" + pos + "/select", null).andExpect(status().isOk());
+        pedir(tecnico, "/api/v1/service-requests/open").andExpect(jsonPath("$.length()").value(0)); // asignado, el técnico queda Ocupado y no ve nuevas (RF-008)
+        jdbc.update("UPDATE usuarios SET disponibilidad = 'AVAILABLE' WHERE correo = ?", "tec@correo.co");
         pedir(tecnico, "/api/v1/service-requests/open").andExpect(jsonPath("$.length()").value(1)); // la asignada sale
         reloj.fijar(ConfiguracionPruebas.T0.plus(Duration.ofMinutes(11)));
         String t2 = campo(enviar(null, "/api/v1/auth/login", "{\"correo\":\"tec@correo.co\",\"clave\":\"clave-segura-1\"}"), "$.accessToken");

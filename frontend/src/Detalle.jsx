@@ -7,7 +7,7 @@ import { RESPALDO_MS, eventosConectados } from './eventos.js';
 import Fotos from './Fotos.jsx';
 import { Icono } from './iconos.jsx';
 import { OfertasHogar, PanelTecnico } from './Negociacion.jsx';
-import { PASOS, cop, cuentaAtras, estrellasTexto, hora, metros } from './util.js';
+import { PASOS, cop, cuentaAtras, estrellasTexto, hora, metros, unirMensajes } from './util.js';
 
 const Mapa = lazy(() => import('./Mapa.jsx')); // Leaflet pesa: se descarga solo cuando hay un mapa en pantalla
 
@@ -140,7 +140,7 @@ function Chat({ s }) {
     ultimaTraida.current = Date.now();
     try {
       const nuevos = await api(`/service-requests/${s.id}/messages?despues=${ultimo.current}`);
-      if (nuevos.length) { ultimo.current = nuevos[nuevos.length - 1].id; setMensajes((m) => [...m, ...nuevos]); }
+      if (nuevos.length) { ultimo.current = nuevos[nuevos.length - 1].id; setMensajes((m) => unirMensajes(m, nuevos)); }
     } catch { /* el chat se reintenta solo */ }
   };
   useEffect(() => {

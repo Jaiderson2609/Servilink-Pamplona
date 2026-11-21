@@ -30,3 +30,10 @@ export const nuevaLlave = () => (globalThis.crypto?.randomUUID?.() ?? `${Date.no
 
 /** Lleva al usuario a otra dirección (el pago en Wompi). Aparte para poder sustituirla en las pruebas. */
 export const irA = (url) => window.location.assign(url);
+
+/** Agrega los mensajes nuevos sin repetir ninguno: dos consultas casi simultáneas (al enviar y por el aviso) traen los mismos. */
+export function unirMensajes(actuales, nuevos) {
+  const vistos = new Set(actuales.map((m) => m.id));
+  const sueltos = nuevos.filter((m) => !vistos.has(m.id));
+  return sueltos.length ? [...actuales, ...sueltos] : actuales;
+}

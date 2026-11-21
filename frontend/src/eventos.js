@@ -6,6 +6,7 @@
  */
 export const RESPALDO_MS = 30000; // con el canal vivo, el sondeo baja a una consulta cada 30 s
 const LATIDO_MS = 25000;
+const SIN_RESPUESTA_MS = 60000; // sin ningún mensaje (ni el pong) en este tiempo, el canal se da por muerto
 const ESPERA_MIN_MS = 1000;
 const ESPERA_MAX_MS = 30000;
 
@@ -17,6 +18,7 @@ let cayo = false;
 let espera = ESPERA_MIN_MS;
 let temporizadorReconexion = null;
 let temporizadorLatido = null;
+let ultimoMensaje = 0;
 const oyentes = new Set();
 const oyentesEstado = new Set();
 
@@ -102,10 +104,17 @@ function conectar() {
     let e;
     try { e = JSON.parse(m.data); } catch { return; }
     if (!e || typeof e.tipo !== 'string') return;
+    ultimoMensaje = Date.now();
     if (e.tipo === 'listo') {
       espera = ESPERA_MIN_MS;
       clearInterval(temporizadorLatido);
-      temporizadorLatido = setInterval(() => { if (s.readyState === 1) s.send('{"tipo":"ping"}'); }, LATIDO_MS);
+      ultimoMensaje = Date.now();
+      temporizadorLatido = setInterval(() => {
+        // Un celular que durmió o cambió de red puede dejar el canal "abierto" pero muerto: sin pong se reconecta,
+        // y al volver se recarga lo que se pudo perder.
+        if (Date.now() - ultimoMensaje > SIN_RESPUESTA_MS) { try { s.close(); } catch { /* ya cerrado */ } return; }
+        if (s.readyState === 1) s.send('{"tipo":"ping"}');
+      }, LATIDO_MS);
       fijarConectado(true);
       if (cayo) { cayo = false; emitir({ tipo: 'reconectado' }); } // lo ocurrido mientras estuvo caído se recarga
     } else if (e.tipo !== 'pong') {
