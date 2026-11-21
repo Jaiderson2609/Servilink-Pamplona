@@ -3,6 +3,9 @@ import { nuevaLlave } from './util.js';
 /** Con VITE_API_URL el cliente puede vivir en otro dominio (p. ej. un sitio estático en Render). */
 const BASE = (import.meta.env?.VITE_API_URL || '') + '/api/v1';
 
+const PLAZO_MS = 20000;
+const PLAZO_SUBIDA_MS = 90000;
+
 let token = null;
 let alVencer = null;
 let alRenovar = null;
@@ -46,10 +49,15 @@ export async function api(ruta, { metodo = 'GET', json, form, blob, llave, reint
   if (form) body = form;
   else if (json !== undefined) { cab['Content-Type'] = 'application/json'; body = JSON.stringify(json); }
   let r;
+  // Sin plazo, una conexión móvil que se quedó colgada deja la pantalla en "Cargando…" para siempre.
+  const control = new AbortController();
+  const plazo = setTimeout(() => control.abort(), form ? PLAZO_SUBIDA_MS : PLAZO_MS);
   try {
-    r = await fetch(BASE + ruta, { method: metodo, headers: cab, body });
+    r = await fetch(BASE + ruta, { method: metodo, headers: cab, body, signal: control.signal });
   } catch {
     throw { status: 0, code: 'NETWORK', message: 'No se pudo conectar con el servidor. Revisa tu conexión.' };
+  } finally {
+    clearTimeout(plazo);
   }
   if (blob && r.ok) return r.blob();
   const txt = await r.text();
