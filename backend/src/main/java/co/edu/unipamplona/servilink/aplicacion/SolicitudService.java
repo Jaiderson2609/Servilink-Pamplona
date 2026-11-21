@@ -20,7 +20,15 @@ public class SolicitudService {
     public record Vista(Long id, String estado, Integer oficioId, String oficio, String descripcion,
                         Integer precioAcordadoCop, Integer comisionCop, Instant expiraEn, Instant terminadoEn,
                         Long hogarId, Long tecnicoId, String motivoCancelacion, Contacto contacto,
-                        Integer distanciaM) {}
+                        Integer distanciaM, UbicacionVista ubicacion) {}
+
+    /** Dónde es el servicio: exacta solo para el hogar y el técnico elegido; aproximada para los demás técnicos. */
+    public record UbicacionVista(double lat, double lng, boolean exacta) {}
+
+    /** Cuadrícula de ~550 m: el técnico que aún no fue elegido ve la zona, no la casa (RF-015, Ley 1581). */
+    private static double aproximar(double v) {
+        return Math.round(v * 200) / 200.0;
+    }
 
     public record VistaOferta(Long id, String autor, Integer montoCop, int secuencia, String estado, Instant creadaEn) {}
 
@@ -204,7 +212,25 @@ public class SolicitudService {
         String oficio = oficios.findById(s.getOficioId()).map(Oficio::getNombre).orElse(null);
         return new Vista(s.getId(), s.getEstado(), s.getOficioId(), oficio, s.getDescripcion(), s.getPrecioAcordado(),
                 s.getComisionCop(), s.getExpiraEn(), s.getTerminadoEn(), s.getHogarId(), s.getTecnicoId(),
-                s.getMotivoCancelacion(), contacto, distanciaM);
+                s.getMotivoCancelacion(), contacto, distanciaM, ubicacion(s, usuarioId, rol));
+    }
+
+    private UbicacionVista ubicacion(Solicitud s, Long usuarioId, String rol) {
+        if (s.getLat() == null || s.getLng() == null) {
+            return null;
+        }
+        if ("HOGAR".equals(rol) && s.getHogarId().equals(usuarioId)) {
+            return new UbicacionVista(s.getLat(), s.getLng(), true);
+        }
+        if ("TECNICO".equals(rol)) {
+            if (usuarioId.equals(s.getTecnicoId()) && EstadoSolicitud.esUnoDe(s.getEstado(), EstadoSolicitud.E03, EstadoSolicitud.E04)) {
+                return new UbicacionVista(s.getLat(), s.getLng(), true);
+            }
+            if (EstadoSolicitud.esUnoDe(s.getEstado(), EstadoSolicitud.E01, EstadoSolicitud.E02)) {
+                return new UbicacionVista(aproximar(s.getLat()), aproximar(s.getLng()), false);
+            }
+        }
+        return null;
     }
 
     private VistaPostulacion vistaPostulacion(Postulacion p) {
