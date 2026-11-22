@@ -22,7 +22,8 @@ export default function Version() {
     let vivo = true;
     const revisar = async () => {
       try {
-        const r = await fetch('/', { cache: 'no-store' });
+        // El service worker guardó '/' al instalarse y respondería esa copia vieja: con un parámetro distinto va siempre a la red.
+        const r = await fetch('/index.html?v=' + Date.now(), { cache: 'no-store' });
         const m = (await r.text()).match(RUTA_SCRIPT);
         if (vivo && m && m[0] !== actual) setNueva(true);
       } catch { /* sin red: se revisa en la próxima */ }

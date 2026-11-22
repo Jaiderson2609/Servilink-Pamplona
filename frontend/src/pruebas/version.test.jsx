@@ -31,6 +31,15 @@ describe('Version', () => {
     expect(screen.queryByText(/versión nueva/i)).toBeNull();
   });
 
+  it('pide la página con un parámetro distinto cada vez para que el service worker no responda su copia vieja', async () => {
+    const pedir = vi.fn(async () => ({ text: async () => '<script src="/assets/index-abc123.js"></script>' }));
+    vi.stubGlobal('fetch', pedir);
+    render(<Version />);
+    await volver();
+    expect(pedir).toHaveBeenCalledTimes(1);
+    expect(pedir.mock.calls[0][0]).toMatch(/^\/index\.html\?v=\d+$/);
+  });
+
   it('sin red tampoco molesta', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('sin red'); }));
     render(<Version />);
