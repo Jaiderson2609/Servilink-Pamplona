@@ -95,7 +95,7 @@ function Contenido({ s, yo, recargar }) {
       )}
 
       {s.tecnicoId != null && (esHogar || esTecnicoAsignado) && <Chat s={s} />}
-      {s.estado === 'E05' && (esHogar || esTecnicoAsignado) && <Calificar s={s} yo={yo} />}
+      {s.estado === 'E05' && (esHogar || esTecnicoAsignado) && <Calificar s={s} yo={yo} recargar={recargar} />}
     </>
   );
 }
@@ -178,21 +178,21 @@ function Chat({ s }) {
   );
 }
 
-function Calificar({ s, yo }) {
+function Calificar({ s, yo, recargar }) {
   const { avisar, intentar } = useUI();
   const [puntos, setPuntos] = useState(0);
   const [comentario, setComentario] = useState('');
   const [listo, setListo] = useState(false);
   const destino = yo.rol === 'HOGAR' ? 'al técnico' : 'al cliente';
 
-  if (listo) return <div className="tarjeta"><h2>Calificación enviada</h2><p className="suave">Gracias por ayudar a que ServiLink sea más confiable.</p></div>;
+  if (listo || s.calificado) return <div className="tarjeta"><h2>Calificación enviada</h2><p className="suave">Gracias por ayudar a que ServiLink sea más confiable.</p></div>;
 
   const enviar = async (ev) => {
     ev.preventDefault();
     if (!puntos) return avisar('Elige de 1 a 5 estrellas', 'error');
     try {
       await api(`/service-requests/${s.id}/ratings`, { metodo: 'POST', json: { estrellas: puntos, comentario: comentario.trim() || null } });
-      avisar('¡Gracias por calificar!', 'ok'); setListo(true);
+      avisar('¡Gracias por calificar!', 'ok'); setListo(true); recargar();
     } catch (e) {
       if (e.status === 409) { avisar('Ya calificaste este servicio'); setListo(true); } else await intentar(() => { throw e; });
     }

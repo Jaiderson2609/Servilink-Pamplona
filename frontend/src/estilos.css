@@ -188,7 +188,7 @@ th { font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; color: 
 
 /* --- React / mapa --- */
 .mapa { position: relative; isolation: isolate; z-index: 0; height: 260px; border-radius: 14px; border: 1px solid var(--linea); overflow: hidden; margin-bottom: .6rem; }
-.compacto .mapa { height: 200px; }
+.compacto .mapa { height: 260px; }
 .mapa-caja { position: relative; }
 .mapa-chip { position: absolute; right: 10px; top: 10px; z-index: 1; padding: 5px 10px; border-radius: 999px; background: #fff; color: #12302d; font-size: 12px; font-weight: 700; pointer-events: none; box-shadow: 0 1px 4px rgba(0, 0, 0, .2); }
 .mapa .leaflet-container { height: 100%; width: 100%; font: inherit; }
@@ -236,7 +236,6 @@ th { font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; color: 
   .ingreso-tarjeta { padding: 24px 20px; }
   .aviso-zona { bottom: calc(68px + 1rem + env(safe-area-inset-bottom, 0px)); }
   .tarjeta.formulario { background: transparent; border: 0; box-shadow: none; padding: 0; margin: 0; }
-  .compacto .mapa { height: 120px; }
 }
 
 /* --- Celular: barra superior, barra inferior y hoja "Más" (medidas del prototipo) --- */
@@ -322,3 +321,7 @@ th { font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; color: 
 /* --- Respuesta al toque (reemplaza el destello azul del navegador) --- */
 .btn:active, .filtro:active, .chip-oficio:active, .item-sol:active, .disp-pildora:active, .mov-fila:active, .lat-item:active { opacity: .8; }
 .mov-item:active .mov-icono { background: #d3ece6; }
+
+/* Aviso de versión nueva: aparece sobre la barra inferior hasta que la persona actualiza. */
+.aviso-version { position: fixed; left: 1rem; right: 1rem; bottom: calc(76px + env(safe-area-inset-bottom, 0px)); z-index: 30; display: flex; align-items: center; justify-content: space-between; gap: .75rem; padding: .7rem 1rem; border-radius: 14px; background: #12302d; color: #fff; font-size: .9rem; box-shadow: 0 4px 16px rgba(0, 0, 0, .25); }
+@media (min-width: 900px) { .aviso-version { left: auto; right: 1.5rem; bottom: 1.5rem; max-width: 380px; } }

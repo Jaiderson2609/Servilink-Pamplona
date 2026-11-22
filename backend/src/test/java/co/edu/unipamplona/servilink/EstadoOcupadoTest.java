@@ -65,4 +65,16 @@ class EstadoOcupadoTest extends PruebaApi {
         patch(hogar, "cancel", "{\"motivo\":\"Ya no lo necesito\"}").andExpect(status().isOk());
         estado("OFFLINE");
     }
+
+    @Test
+    void elServidorRecuerdaQuienYaCalifico() throws Exception {
+        elegir();
+        patch(tecnico, "arrive", "{}").andExpect(status().isOk());
+        patch(tecnico, "complete", "{}").andExpect(status().isOk());
+        patch(hogar, "confirm", "{}").andExpect(status().isOk());
+        pedir(hogar, "/api/v1/service-requests/" + sol).andExpect(jsonPath("$.calificado").value(false));
+        enviar(hogar, "/api/v1/service-requests/" + sol + "/ratings", "{\"estrellas\":5}").andExpect(status().isCreated());
+        pedir(hogar, "/api/v1/service-requests/" + sol).andExpect(jsonPath("$.calificado").value(true));
+        pedir(tecnico, "/api/v1/service-requests/" + sol).andExpect(jsonPath("$.calificado").value(false));
+    }
 }

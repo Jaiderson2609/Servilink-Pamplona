@@ -10,7 +10,7 @@ const ESTADOS = { AVAILABLE: 'Disponible', BUSY: 'Ocupado', OFFLINE: 'No disponi
  */
 export default function Disponibilidad({ compacta = false }) {
   const { intentar, avisar } = useUI();
-  const { datos, recargar } = usePolling(() => api('/technicians/me/availability'), 0, []);
+  const { datos, recargar } = usePolling(() => api('/technicians/me/availability'), 30000, [], (e) => e.tipo === 'solicitud'); // cambia sola al ser elegido, terminar o cancelar
   const poner = async (estado) => {
     const r = await intentar(() => api('/technicians/me/availability', { metodo: 'PATCH', json: { estado } }));
     if (r) { avisar('Disponibilidad actualizada', 'ok'); recargar(); }

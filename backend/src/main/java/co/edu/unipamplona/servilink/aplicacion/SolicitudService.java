@@ -20,7 +20,7 @@ public class SolicitudService {
     public record Vista(Long id, String estado, Integer oficioId, String oficio, String descripcion,
                         Integer precioAcordadoCop, Integer comisionCop, Instant expiraEn, Instant terminadoEn,
                         Long hogarId, Long tecnicoId, String motivoCancelacion, Contacto contacto,
-                        Integer distanciaM, UbicacionVista ubicacion) {}
+                        Integer distanciaM, UbicacionVista ubicacion, boolean calificado) {}
 
     /** Dónde es el servicio: exacta solo para el hogar y el técnico elegido; aproximada para los demás técnicos. */
     public record UbicacionVista(double lat, double lng, boolean exacta) {}
@@ -212,7 +212,14 @@ public class SolicitudService {
         String oficio = oficios.findById(s.getOficioId()).map(Oficio::getNombre).orElse(null);
         return new Vista(s.getId(), s.getEstado(), s.getOficioId(), oficio, s.getDescripcion(), s.getPrecioAcordado(),
                 s.getComisionCop(), s.getExpiraEn(), s.getTerminadoEn(), s.getHogarId(), s.getTecnicoId(),
-                s.getMotivoCancelacion(), contacto, distanciaM, ubicacion(s, usuarioId, rol));
+                s.getMotivoCancelacion(), contacto, distanciaM, ubicacion(s, usuarioId, rol),
+                calificado(s, usuarioId));
+    }
+
+    /** Si quien consulta ya calificó este servicio (para no pedirle la calificación otra vez al recargar). */
+    private boolean calificado(Solicitud s, Long usuarioId) {
+        return usuarioId != null && EstadoSolicitud.E05.es(s.getEstado())
+                && calificaciones.existsBySolicitudIdAndAutorId(s.getId(), usuarioId);
     }
 
     private UbicacionVista ubicacion(Solicitud s, Long usuarioId, String rol) {
