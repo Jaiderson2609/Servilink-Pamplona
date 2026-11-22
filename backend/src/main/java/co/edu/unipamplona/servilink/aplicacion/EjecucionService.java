@@ -18,10 +18,12 @@ public class EjecucionService {
     private final SolicitudService consultas;
     private final Clock reloj;
     private final PublicadorEventos eventos;
+    private final co.edu.unipamplona.servilink.repositorio.UsuarioRepositorio usuarios;
 
     public EjecucionService(SolicitudRepositorio solicitudes, BilleteraRepositorio billeteras,
                             MovimientoRepositorio libro, NotificacionRepositorio avisos, SolicitudService consultas,
-                            Clock reloj, PublicadorEventos eventos) {
+                            Clock reloj, PublicadorEventos eventos,
+                            co.edu.unipamplona.servilink.repositorio.UsuarioRepositorio usuarios) {
         this.solicitudes = solicitudes;
         this.billeteras = billeteras;
         this.libro = libro;
@@ -29,6 +31,12 @@ public class EjecucionService {
         this.consultas = consultas;
         this.reloj = reloj;
         this.eventos = eventos;
+        this.usuarios = usuarios;
+    }
+
+    /** RF-008: al cerrarse o cancelarse el servicio, el técnico vuelve a Disponible (si él no se puso Desconectado). */
+    private void liberarTecnico(Long tecnicoId) {
+        usuarios.findById(tecnicoId).filter(u -> "BUSY".equals(u.getDisponibilidad())).ifPresent(u -> u.setDisponibilidad("AVAILABLE"));
     }
 
     /** TR-04 (RF-029): solo el técnico asignado marca su llegada. */
@@ -82,6 +90,7 @@ public class EjecucionService {
         libro.save(new Movimiento(b.getTecnicoId(), s.getId(), "COMISION", comision, b.getDisponible(),
                 "COM-" + s.getId(), reloj.instant()));
         s.setEstado(EstadoSolicitud.E05.codigo());
+        liberarTecnico(s.getTecnicoId());
         Long aviso = aviso("FIN-" + s.getId(), s.getTecnicoId(), "El hogar confirmó el trabajo. ¡Gracias!");
         eventos.solicitud(s);
         return new Efecto<>(consultas.vista(s, hogarId, "HOGAR"), aviso);
@@ -114,6 +123,7 @@ public class EjecucionService {
                     "LIB-" + s.getId(), reloj.instant()));
             Long contraparte = "HOGAR".equals(rol) ? s.getTecnicoId() : s.getHogarId();
             avisoId = aviso("CANC-" + s.getId(), contraparte, "El servicio fue cancelado");
+            liberarTecnico(s.getTecnicoId());
         } else {
             throw estadoInvalido(s);
         }
@@ -145,6 +155,7 @@ public class EjecucionService {
             libro.save(new Movimiento(b.getTecnicoId(), s.getId(), "LIBERACION", comision, b.getDisponible(),
                     "LIB-" + s.getId(), reloj.instant()));
             aviso("CANCA-" + s.getId() + "-T", s.getTecnicoId(), "Un administrador canceló el servicio");
+            liberarTecnico(s.getTecnicoId());
         }
         Long avisoHogar = aviso("CANCA-" + s.getId() + "-H", s.getHogarId(), "Un administrador canceló tu solicitud");
         s.setEstado(EstadoSolicitud.E07.codigo());

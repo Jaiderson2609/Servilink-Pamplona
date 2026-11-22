@@ -102,6 +102,7 @@ public class AsignacionService {
         sol.setComisionPct(pct); // RN-14: el porcentaje queda congelado para este servicio
         sol.setComisionCop((int) comision);
         pos.setEstado("ELEGIDA");
+        tecnico.setDisponibilidad("BUSY"); // RF-008: el técnico pasa a Ocupado mientras dura el servicio
         for (Postulacion otra : postulaciones.findBySolicitudId(sol.getId())) { // RF-024: se descartan las demás
             if (!otra.getId().equals(pos.getId()) && "ACTIVA".equals(otra.getEstado())) {
                 otra.setEstado("DESCARTADA");
