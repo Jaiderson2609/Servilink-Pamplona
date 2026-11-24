@@ -152,7 +152,8 @@ public class SolicitudService {
         boolean abiertaParaTecnico = "TECNICO".equals(rol)
                 && EstadoSolicitud.esUnoDe(s.getEstado(), EstadoSolicitud.E01, EstadoSolicitud.E02)
                 && usuarios.findById(usuarioId).map(u -> "APROBADA".equals(u.getVerificacion())).orElse(false);
-        if (!esHogar && !esTecnico && !abiertaParaTecnico) {
+        // El administrador revisa cualquier solicitud (disputas, auditoría), sin teléfono ni dirección exacta (ver vista()).
+        if (!esHogar && !esTecnico && !abiertaParaTecnico && !"ADMIN".equals(rol)) {
             throw new ErrorNegocio(Codigo.FORBIDDEN, "No participas en esta solicitud");
         }
         return vista(s, usuarioId, rol);
@@ -205,7 +206,7 @@ public class SolicitudService {
 
     Vista vista(Solicitud s, Long usuarioId, String rol, Integer distanciaM) {
         Contacto contacto = null;
-        if (EstadoSolicitud.esUnoDe(s.getEstado(), EstadoSolicitud.E03, EstadoSolicitud.E04, EstadoSolicitud.E05) && s.getTecnicoId() != null) {
+        if (!"ADMIN".equals(rol) && EstadoSolicitud.esUnoDe(s.getEstado(), EstadoSolicitud.E03, EstadoSolicitud.E04, EstadoSolicitud.E05) && s.getTecnicoId() != null) {
             Long otroId = "HOGAR".equals(rol) ? s.getTecnicoId() : s.getHogarId();
             contacto = usuarios.findById(otroId).map(u -> new Contacto(u.getNombre(), u.getTelefono())).orElse(null);
         }
