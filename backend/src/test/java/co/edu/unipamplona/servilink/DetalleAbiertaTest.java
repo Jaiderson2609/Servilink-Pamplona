@@ -56,4 +56,17 @@ class DetalleAbiertaTest extends PruebaIntegracion {
         mvc.perform(get("/api/v1/service-requests/" + sol).header("Authorization", "Bearer " + token("HOGAR", otro)))
                 .andExpect(status().isForbidden());
     }
+
+    @Test
+    void elAdministradorAbreCualquierSolicitudSinTelefonoNiDireccionExacta() throws Exception {
+        long admin = usuario("ADMIN", "Admin Demo", "3000000009");
+        for (String estado : new String[] {"E01", "E03", "E05", "E07"}) {
+            jdbc.update("TRUNCATE postulaciones, solicitudes RESTART IDENTITY CASCADE");
+            long sol = solicitud(hogar, estado, T0.plus(Duration.ofMinutes(10)));
+            jdbc.update("UPDATE solicitudes SET tecnico_id = ?, lat = 7.3772, lng = -72.6473 WHERE id = ?", tecnico, sol);
+            mvc.perform(get("/api/v1/service-requests/" + sol).header("Authorization", "Bearer " + token("ADMIN", admin)))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.estado").value(estado))
+                    .andExpect(jsonPath("$.contacto").doesNotExist()).andExpect(jsonPath("$.ubicacion").doesNotExist());
+        }
+    }
 }
